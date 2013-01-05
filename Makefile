@@ -162,6 +162,9 @@ test_simple_khash: tests/simple_khashtest.c
 test_khash: tests/test_khashtest.cpp include/TW/tw_khash.h include/TW/khash.h
 	$(CC_PLUS) $(CFLAGS) $(LDFLAGS) -I. $(TWLIBFLAG) -o $@ tests/test_khashtest.cpp tw_log.o syscalls-$(ARCH).o
 
+test_rbtree: tw_lib tests/test_rbtree.cpp include/TW/tw_rbtree.h include/TW/provos_rb_tree.h include/TW/tw_khash.h include/TW/khash.h
+	$(CC_PLUS) $(CFLAGS) $(LDFLAGS) -I. $(TWLIBFLAG) -o $@ tests/test_rbtree.cpp tw_log.o syscalls-$(ARCH).o
+
 test_hashes: tw_lib tests/test_hashes.cpp include/TW/tw_khash.h include/TW/khash.h
 	$(CC_PLUS) $(CFLAGS) $(LDFLAGS) $(LD_TEST_FLAGS) -I. $(TWLIBFLAG) -o $@ tests/test_hashes.cpp tw_log.o syscalls-$(ARCH).o
 

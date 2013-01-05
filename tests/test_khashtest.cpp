@@ -55,8 +55,8 @@ struct string_eqstrP {
 };
 
 struct string_eqstrPP {
-	  inline int operator() (const string **l,
-	                  const string **r) const
+	  inline int operator() (const string * const *l,
+	                  const string * const *r) const
 	  {
 		  return ((*l)->compare(**r) == 0);
 	  }
