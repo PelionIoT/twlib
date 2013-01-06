@@ -3,7 +3,7 @@
  *
  *  Created on: Nov 29, 2011
  *      Author: ed
- * (c) 2011, Framez LLC
+ * (c) 2011, WigWag LLC
  */
 
 #ifndef TW_LIST_H_

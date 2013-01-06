@@ -1,3 +1,11 @@
+/*
+ * tw_khash2.h
+ *
+ *  Created on: Jan 5, 2013
+ *      Author: Ed Hemphill (ed@wigwag.com)
+ * (c) 2012, WigWag LLC
+ */
+
 #ifndef TW_RBTREE_H
 #define TW_RBTREE_H
 

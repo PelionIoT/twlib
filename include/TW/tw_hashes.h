@@ -3,7 +3,7 @@
  *
  *  Created on: Nov 25, 2011
  *      Author: ed
- * (c) 2011, Framez LLC
+ * (c) 2011, WigWag LLC
  */
 
 #ifndef TW_HASHES_H_

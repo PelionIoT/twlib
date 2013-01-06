@@ -3,7 +3,7 @@
  *
  *  Created on: Jan 19, 2012
  *      Author: ed
- * (c) 2012, Framez LLC
+ * (c) 2012, WigWag LLC
  */
 
 #ifndef TW_MMANAGER_H_
