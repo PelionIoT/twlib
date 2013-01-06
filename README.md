@@ -20,6 +20,12 @@ You will need [Google sparsehash and densehash](http://code.google.com/p/sparseh
 
 After cloning, take a look at the Makefile. You will need to place gtest and sparsehash in __exapanded_prereqs__ or another directory you provide.
 
+Then just:
+
+```
+    make tw_lib
+```
+
 ###Status###
 
 twlib is a work in progress right now, but much of the code is well tested. 
