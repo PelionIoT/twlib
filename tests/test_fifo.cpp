@@ -1,4 +1,4 @@
-// Framez LLC
+// WigWag LLC
 // (c) 2010
 // test_fifo.cpp
 // Author: ed

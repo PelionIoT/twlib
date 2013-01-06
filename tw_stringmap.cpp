@@ -3,7 +3,7 @@
  *
  *  Created on: Mar 8, 2012
  *      Author: ed
- * (c) 2012, Framez LLC
+ * (c) 2012, WigWag LLC
  */
 
 #include <TW/tw_stringmap.h>

@@ -1,4 +1,4 @@
-// Framez LLC
+// WigWag LLC
 // (c) 2010
 // testzsparsehash.cpp
 // Author: ed

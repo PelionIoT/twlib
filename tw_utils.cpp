@@ -1,4 +1,4 @@
-// Framez LLC
+// WigWag LLC
 // (c) 2011
 // tw_time.cpp
 // Author: ed

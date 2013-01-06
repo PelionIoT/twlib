@@ -1,4 +1,4 @@
-// Framez LLC
+// WigWag LLC
 // (c) 2011
 // test_tw_sema.cpp
 // Author: ed

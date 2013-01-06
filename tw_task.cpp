@@ -3,7 +3,7 @@
  *
  *  Created on: Nov 23, 2011
  *      Author: ed
- * (c) 2011, Framez LLC
+ * (c) 2011, WigWag LLC
  */
 
 #include <TW/tw_task.h>
