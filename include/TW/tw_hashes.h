@@ -26,6 +26,24 @@ struct hashInt {
 	}
 };
 
+struct hash_uint32t {
+	inline size_t operator()(const uint32_t &x) const {
+		return (size_t) (x);
+	}
+};
+
+
+template <typename T>
+struct eqstr_numericP {
+	  inline int operator() (const T *kt1,
+	                  const T *kt2) const
+	  {
+//		  TW_DEBUG("--------- COMPARE...\n",NULL);
+		  if (*kt1 == *kt2) return 1;
+		  else return 0;
+	  }
+};
+
 
 
 } // end namespace

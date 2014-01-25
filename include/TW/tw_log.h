@@ -51,7 +51,7 @@
 #define TW_PREFIX_CRITICAL "CRITICAL "
 #define TW_PREFIX_CRASH "CRASH "
 #define TW_PRE_LINE "(%s:%d) "
-#define TW_PRE_LINE_THREAD "(%s:%d,%d) "
+#define TW_PRE_LINE_THREAD "(%s:%d,lwp:%d) "
 
 // if TWLOG_PRINT_MODULENAME is defined then every log entry will have the file/line number of where the log call was made
 #ifdef TWLOG_PRINT_MODULENAME
