@@ -61,6 +61,10 @@ public:
 	tw_safeFIFO( HANDLE theHeap );
 #endif
 	void add( T &d );
+#if __cplusplus <= 201103L
+	void add( T &&d );
+#endif
+
 	void addToHead( T &d );
 	void transferFrom( tw_safeFIFO<T,ALLOC> &other ); // transfer record from other to 'this' - can block
 	bool transferFromNoBlock( tw_safeFIFO<T,ALLOC> &other ); // transfer record from other to 'this' -
@@ -769,7 +773,41 @@ void tw_safeFIFO<T,ALLOC>::add( T &the_d ) {
 	pthread_mutex_unlock(&dataMutex);
 	unblock(); // let one blocking call know...
 }
+#if __cplusplus <= 201103L
+template <class T,class ALLOC>
+void tw_safeFIFO<T,ALLOC>::add( T &&the_d ) {
+	tw_FIFO_link *newlink;
+#ifdef _TW_WINDOWS
+	newlink = (tw_FIFO_link *) HeapAlloc( hHeap, 0, sizeof( tw_FIFO_link ));
+#else
+	newlink = (tw_FIFO_link *) ALLOC::malloc( sizeof( tw_FIFO_link ));
+#endif
+	newlink->init_link(the_d);
+//	newlink->prev=NULL;
+//	newlink->d = the_d;
+//	newlink->prev = in;
+	pthread_mutex_lock(&dataMutex);
+	if(enabled) {
+	if(in)
+		in->next = newlink;
+	in = newlink;
+	if(!out) {
+		out = in;
+	}
+	remain++;
+#ifdef _TW_FIFO_DEBUG_ON
+	TW_DEBUG_LT("tw_safeFifo:add - blk_cnt: %d\n",_block_cnt);
+#endif
+	}
+#ifdef _TW_FIFO_DEBUG_ON
+	else
+		TW_DEBUG_LT("tw_safeFIFO: not enabled\n");
+#endif
 
+	pthread_mutex_unlock(&dataMutex);
+	unblock(); // let one blocking call know...
+}
+#endif
 
 template <class T,class ALLOC>
 void tw_safeFIFO<T,ALLOC>::addToHead( T &the_d ) {
