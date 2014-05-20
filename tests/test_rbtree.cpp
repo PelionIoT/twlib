@@ -107,7 +107,7 @@ int main() {
 //	TW_KHash_32<string, TESTD, TW_Mutex, string_eqstrP, TWlib::Allocator<Alloc_Std> > hashmap;
 //	TW_KHash_32<string *, TESTD, TW_Mutex, string_eqstrPP, TWlib::Allocator<Alloc_Std> > hashmap2;
 
-	TWlib::RB_Tree<string, string_cmpP, TWlib::Allocator<TWlib::Alloc_Std> > tree1;
+	TWlib::RB_Tree<string *, string_cmpP, TWlib::Allocator<TWlib::Alloc_Std> > tree1;
 
 	/*	int ret, is_missing;
 	khiter_t k;
@@ -136,7 +136,8 @@ int main() {
 		out << "Val " << x;
 		test_strs[x] = out.str();
 //		hashmap.addNoreplace(test_strs[x],testd);
-		tree1.insert(&test_strs[x]);
+		string *temp = &test_strs[x];
+		tree1.insert(temp);
 		cout << "Added string \""<< test_strs[x] << "\"" << endl;
 	}
 
@@ -144,14 +145,15 @@ int main() {
 
 	for(int x=0;x<loop;x++ ) {
 		cout << test_strs[x] << endl;
-		string *s = tree1.find(test_strs[x]);
+		string *temp = &test_strs[x];
+		string *s = tree1.find(temp);
 		if(s) {
 			cout << "Have string: " << *s << endl;
 		} else
 			cout << "NULL" << endl;
 	}
 
-	TWlib::RB_Tree<string, string_cmpP, TWlib::Allocator<TWlib::Alloc_Std> >::Iter iter1(tree1);
+	TWlib::RB_Tree<string *, string_cmpP, TWlib::Allocator<TWlib::Alloc_Std> >::Iter iter1(tree1);
 
 	iter1.startMin();
 
@@ -174,7 +176,8 @@ int main() {
 	for(int x=0;x<loop;x++ ) {
 		string *s3 = NULL;
 		if((x % 2) > 0) {
-			s3 = tree1.remove(test_strs[x]);
+			string *temp = &test_strs[x];
+			s3 = tree1.remove(temp);
 		}
 		if(s3) {
 			cout << "Removed " << *s3 << endl;

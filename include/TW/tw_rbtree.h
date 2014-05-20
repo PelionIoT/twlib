@@ -42,7 +42,7 @@ class RB_Tree {
 protected:
 
 	struct rb_node {
-		T *data;
+		T data;
 		RB_ENTRY(rb_node) node;
 	};
 	RB_HEAD(rb_head_t, rb_node) rb_head;
@@ -84,8 +84,8 @@ public:
 		 * Get's the next (greater) element of T
 		 * return NULL if at end, T * of data otherwise.
 		 */
-		T *getNext() {
-			T *ret = NULL;
+		T getNext() {
+			T ret = NULL;
 			if(!node) return NULL;
 			rb_node *nex = RB_NEXT(rb_head_t, &tree.rb_head, node);
 			if(nex) {
@@ -97,8 +97,8 @@ public:
 		/* Get's the previous (less than) element of T
 		 * return NULL if at end, T * of data otherwise.
 		 */
-		T *getPrev() {
-			T *ret = NULL;
+		T getPrev() {
+			T ret = NULL;
 			if(!node) return NULL;
 			rb_node *nex = RB_PREV(rb_head_t, &tree.rb_head, node);
 			if(nex) {
@@ -108,13 +108,13 @@ public:
 			return ret;
 		}
 
-		T *current() {
+		T current() {
 			if(!node) return NULL;
 			return node->data;
 		}
 	};
 
-	void insert( T *data ) {
+	void insert( T &data ) {
 		rb_node *newnode = (rb_node*)ALLOC::calloc(1, sizeof(rb_node));
 		newnode->data = data;
 		RB_INSERT(rb_head_t, &rb_head, newnode);
@@ -123,9 +123,9 @@ public:
 	/**
 	 * Finds T entry where data == entry
 	 */
-	T *find( const T &data ) {
+	T find( const T &data ) {
 		rb_node lookup;
-		lookup.data = const_cast<T *>(&data);
+		lookup.data = data;
 		rb_node *found = RB_FIND(rb_head_t, &rb_head, &lookup);
 		if(found)
 			return found->data;
@@ -133,20 +133,32 @@ public:
 			return NULL;
 	}
 
+	bool find( const T &data, T &fill ) {
+		rb_node lookup;
+		lookup.data = data;
+		rb_node *found = RB_FIND(rb_head_t, &rb_head, &lookup);
+		if(found) {
+			fill = found->data;
+			return true;
+		}
+		else
+			return false;
+	}
+
 	/**
 	 * Finds the first entry T where the entry in the tree is >= 'data' search key
 	 */
-	T *nfind( const T &data ) {
+	T nfind( const T &data ) {
 		rb_node lookup;
 		lookup.data = const_cast<T *>(&data);
 		return RB_NFIND(rb_head_t, &rb_head, &lookup);
 	}
 
 
-	T *remove( const T &data ) {
-		T *ret = NULL;
+	T remove( const T &data ) {
+		T ret = NULL;
 		rb_node lookup;
-		lookup.data = const_cast<T *>(&data);
+		lookup.data = data;
 		rb_node *found = RB_FIND(rb_head_t, &rb_head, &lookup);
 		if(found) {
 			ret = found->data;

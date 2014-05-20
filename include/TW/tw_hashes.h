@@ -44,7 +44,16 @@ struct eqstr_numericP {
 	  }
 };
 
-
+template <typename T>
+struct eqstr_numeric {
+	  inline int operator() (const T kt1,
+	                  const T kt2) const
+	  {
+//		  TW_DEBUG("--------- COMPARE...\n",NULL);
+		  if (kt1 == kt2) return 1;
+		  else return 0;
+	  }
+};
 
 } // end namespace
 #endif /* TW_HASHES_H_ */

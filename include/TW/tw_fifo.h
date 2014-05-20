@@ -61,7 +61,7 @@ public:
 	tw_safeFIFO( HANDLE theHeap );
 #endif
 	void add( T &d );
-#if __cplusplus <= 201103L
+#if __cplusplus >= 201103L
 	void add( T &&d );
 #endif
 
@@ -773,7 +773,7 @@ void tw_safeFIFO<T,ALLOC>::add( T &the_d ) {
 	pthread_mutex_unlock(&dataMutex);
 	unblock(); // let one blocking call know...
 }
-#if __cplusplus <= 201103L
+#if __cplusplus >= 201103L
 template <class T,class ALLOC>
 void tw_safeFIFO<T,ALLOC>::add( T &&the_d ) {
 	tw_FIFO_link *newlink;
