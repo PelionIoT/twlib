@@ -1,19 +1,19 @@
 
-LDFLAGS= -lpthread
-TWLIBFLAG= -L. -lTW
-TWLIBNAME=libTW
-TWSOLIBNAME= $(TWLIBNAME).so
-TWSONAME= $(TWSOLIBNAME).1.0.1
-TWSOVERSION= $(TWSOLIBNAME).1
-TWSTATICNAME= $(TWLIBNAME).a
+LDFLAGS ?= -lpthread
+TWLIBFLAG ?= -L. -lTW
+TWLIBNAME ?= libTW
+TWSOLIBNAME ?= $(TWLIBNAME).so
+TWSONAME ?= $(TWSOLIBNAME).1.0.1
+TWSOVERSION ?= $(TWSOLIBNAME).1
+TWSTATICNAME ?= $(TWLIBNAME).a
 # TWSOVERSION is the compiler version...
 # see http://rute.2038bug.com/node26.html.gz
 
-CC_PLUS= g++ -g -O0 -fPIC
-CC= gcc -g -O0 -fPIC
-AR= ar
+CXX ?= g++ -g -O0 -fPIC
+CC ?= gcc -g -O0 -fPIC
+AR ?= ar
 
-ARCH=x86
+ARCH ?=x86
 #ARCH=armel
 SYSCALLS= syscalls-$(ARCH).c
 
@@ -21,7 +21,7 @@ ALLOBJS= $($<:%.cpp=%.o)
 
 DEBUG_OPTIONS=-rdynamic -D_TW_TASK_DEBUG_THREADS_ 
 #-D_TW_BUFBLK_DEBUG_STACK_
-CFLAGS= $(DEBUG_OPTIONS) $(GLIBCFLAG) -D_TW_DEBUG -I./include  -D__DEBUG  
+CFLAGS= $(DEBUG_OPTIONS) $(GLIBCFLAG) -D_TW_DEBUG -I./include  -D__DEBUG   -fPIC
 
 CROSS_PREREQ_LIBS=freescale.out/expanded-prereqs/lib
 CROSS_PREREQ_HEADERS=freescale.out/expanded-prereqs/include
@@ -46,17 +46,17 @@ ifdef FREESCALE
 	CROSS_INCLUDE=$(CROSS_CC_BASE)/arm-fsl-linux-gnueabi/multi-libs/usr/include/
 	#/opt/freescale/usr/local/gcc-4.4.4-glibc-2.11.1-multilib-1.0/arm-fsl-linux-gnueabi
 	CROSS_CC=$(CROSS_CC_BASE)/bin/$(TOOL_PREFIX)-gcc
-	CROSS_CC_PLUS=$(CROSS_CC_BASE)/bin/$(TOOL_PREFIX)-g++
+	CROSS_CXX=$(CROSS_CC_BASE)/bin/$(TOOL_PREFIX)-g++
 	CROSS_AR=$(CROSS_CC_BASE)/bin/$(TOOL_PREFIX)-ar
 #	@echo Using GCC toolchain for Freescale i.MX28: $(CROSS_CC)
 	CC= $(CROSS_CC) -g -O0 -fPIC -D__ZDB_ARM__ $(TARGET_ARCH) $(TARGET_TUNE) -I$(CROSS_INCLUDE) -I$(CROSS_PREREQ_HEADERS)
-	CC_PLUS= $(CROSS_CC_PLUS) -g -O0 -fPIC -D__ZDB_ARM__ $(TARGET_ARCH) $(TARGET_TUNE) -I$(CROSS_INCLUDE) -I$(CROSS_PREREQ_HEADERS)
+	CXX= $(CROSS_CXX) -g -O0 -fPIC -D__ZDB_ARM__ $(TARGET_ARCH) $(TARGET_TUNE) -I$(CROSS_INCLUDE) -I$(CROSS_PREREQ_HEADERS)
 	AR=$(CROSS_AR)
 	LD_FLAGS+= -L$(CROSS_CC_BASE)/multi-libs/armv5te/usr/lib -L$(CROSS_PREREQ_LIBS)  -Wl,-rpath-link,$(CSTOOLS_LIB) -Wl,-O1 -Wl,--hash-style=gnu 
 	CFLAGS+= -Lfreescale.out/expanded-prereqs/lib
 	OUTPUT_DIR=freescale.out
 else
-	CFLAGS+= -Lexpanded-prereqs/lib -Iexpanded-prereqs/include -I/usr/include 
+	CFLAGS+= -Lexpanded-prereqs/lib -Iexpanded-prereqs/include -I/usr/include  -fPIC
 endif
 
 GLIBCFLAG=-D_USING_GLIBC_
@@ -83,7 +83,7 @@ TPLS= include/TW/tw_fifo.h include/TW/tw_task.h include/TW/tw_alloc.h include/TW
 ## library that already contains the needed object file.
 
 $(OUTPUT_DIR)/%.o: %.cpp
-	$(CC_PLUS) $(CFLAGS) -c $< -o $@
+	$(CXX) $(CFLAGS) -c $< -o $@
 
 $(OUTPUT_DIR)/%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -97,23 +97,23 @@ testzstring: testzstrings testzstrings2 testzstringmem $(ZSTRING_OBJ) $(ZSTRING_
 
 
 tw_lib: $(OBJS) $(HDRS) $(TPLS) $(EXTRA_TARGET)
-	$(CC_PLUS) $(CFLAGS) -I. $(LDFLAGS) -shared -Wl,-soname,$(TWSOVERSION) -o $(OUTPUT_DIR)/$(TWSONAME) $(OBJS) $(TPLS)
+	$(CXX) $(CFLAGS) -I. $(LDFLAGS) -shared -Wl,-soname,$(TWSOVERSION) -o $(OUTPUT_DIR)/$(TWSONAME) $(OBJS) $(TPLS)
 	ln -sf $(TWSONAME) $(OUTPUT_DIR)/$(TWSOVERSION) && \
 		ln -sf $(TWSONAME) $(OUTPUT_DIR)/$(TWSOLIBNAME)
 	$(AR) rcs $(OUTPUT_DIR)/$(TWSTATICNAME) $(OBJS)  # build static library
 
 
 test_fifo: tests/test_fifo.cpp $(TPLS)
-	$(CC_PLUS) $(CFLAGS) $(LDFLAGS) -I. -o $@ tests/$@.cpp $(TPLS) 
+	$(CXX) $(CFLAGS) $(LDFLAGS) -I. -o $@ tests/$@.cpp $(TPLS) 
 
 test_fifo_task: tw_lib tests/test_fifo_task.cpp $(TPLS)
-	$(CC_PLUS) $(CFLAGS) $(TWLIBFLAG) $(LDFLAGS) -I. -o $@ tests/$@.cpp $(TPLS) 
+	$(CXX) $(CFLAGS) $(TWLIBFLAG) $(LDFLAGS) -I. -o $@ tests/$@.cpp $(TPLS) 
 
 test_fifo_bufs: tw_lib tests/test_fifo_bufs.cpp $(TPLS) tw_log.o 
-	$(CC_PLUS) $(CFLAGS) $(TWLIBFLAG) $(LDFLAGS)  -I. -o $@ tests/$@.cpp tw_log.o syscalls-$(ARCH).o $(TPLS) 
+	$(CXX) $(CFLAGS) $(TWLIBFLAG) $(LDFLAGS)  -I. -o $@ tests/$@.cpp tw_log.o syscalls-$(ARCH).o $(TPLS) 
 
 test_tw_sema_basetask: tw_lib tests/test_tw_sema_basetask.cpp $(TPLS) tw_log.o 
-	$(CC_PLUS) $(CFLAGS) $(TWLIBFLAG) $(LDFLAGS)  -I. -o $@ tests/$@.cpp tw_log.o syscalls-$(ARCH).o $(TPLS) 
+	$(CXX) $(CFLAGS) $(TWLIBFLAG) $(LDFLAGS)  -I. -o $@ tests/$@.cpp tw_log.o syscalls-$(ARCH).o $(TPLS) 
 
 freescale_dir:
 	-mkdir -p freescale.out
@@ -121,52 +121,52 @@ freescale_dir:
 .PHONY: freescale_dir
 
 testtwcontainers: tw_lib tests/testtwcontainers.cpp $(TPLS) tw_log.o 
-	$(CC_PLUS) $(CFLAGS) $(TWLIBFLAG) $(LDFLAGS)  -I. -o $@ tests/$@.cpp tw_log.o syscalls-$(ARCH).o $(TPLS) 
+	$(CXX) $(CFLAGS) $(TWLIBFLAG) $(LDFLAGS)  -I. -o $@ tests/$@.cpp tw_log.o syscalls-$(ARCH).o $(TPLS) 
 
 test_tw_sema: tw_lib tests/test_tw_sema.cpp $(TPLS) tw_log.o tw_utils.o
-	$(CC_PLUS) $(CFLAGS) $(TWLIBFLAG) $(LDFLAGS)  -I. -o $@ tests/$@.cpp tw_utils.o tw_log.o syscalls-$(ARCH).o $(TPLS) 
+	$(CXX) $(CFLAGS) $(TWLIBFLAG) $(LDFLAGS)  -I. -o $@ tests/$@.cpp tw_utils.o tw_log.o syscalls-$(ARCH).o $(TPLS) 
 
 test_tw_bndsafefifo: tw_lib tests/test_tw_bndsafefifo.cpp $(TPLS) tw_log.o tw_utils.o
-	$(CC_PLUS) $(CFLAGS) $(TWLIBFLAG) $(LDFLAGS)  -I. -o $@ tests/$@.cpp tw_utils.o tw_log.o syscalls-$(ARCH).o $(TPLS) 
+	$(CXX) $(CFLAGS) $(TWLIBFLAG) $(LDFLAGS)  -I. -o $@ tests/$@.cpp tw_utils.o tw_log.o syscalls-$(ARCH).o $(TPLS) 
 
 regr_tw_bufblk: tw_lib tests/regr_tw_bufblk.cpp $(TPLS) tw_log.o tests/testutils.cpp
-	$(CC_PLUS) $(CFLAGS) -c -I. tests/testutils.cpp
-	$(CC_PLUS) $(CFLAGS) $(TWLIBFLAG) $(LD_TEST_FLAGS) $(LDFLAGS)  -I. -o $@ tests/$@.cpp tw_log.o testutils.o syscalls-$(ARCH).o $(TPLS) 
+	$(CXX) $(CFLAGS) -c -I. tests/testutils.cpp
+	$(CXX) $(CFLAGS) $(TWLIBFLAG) $(LD_TEST_FLAGS) $(LDFLAGS)  -I. -o $@ tests/$@.cpp tw_log.o testutils.o syscalls-$(ARCH).o $(TPLS) 
 
 test_list: tw_lib tests/test_list.cpp $(TPLS) tw_log.o tests/testutils.cpp
-	$(CC_PLUS) $(CFLAGS) -c -I. tests/testutils.cpp
-	$(CC_PLUS) $(CFLAGS) $(TWLIBFLAG) $(LD_TEST_FLAGS) $(LDFLAGS)  -I. -o $@ tests/$@.cpp tw_log.o testutils.o syscalls-$(ARCH).o $(TPLS) 
+	$(CXX) $(CFLAGS) -c -I. tests/testutils.cpp
+	$(CXX) $(CFLAGS) $(TWLIBFLAG) $(LD_TEST_FLAGS) $(LDFLAGS)  -I. -o $@ tests/$@.cpp tw_log.o testutils.o syscalls-$(ARCH).o $(TPLS) 
 
 test_twarray: tw_lib tests/test_twarray.cpp $(TPLS) tw_log.o tests/testutils.cpp
-	$(CC_PLUS) $(CFLAGS) -c -I. tests/testutils.cpp
-	$(CC_PLUS) $(CFLAGS) $(TWLIBFLAG) $(LD_TEST_FLAGS) $(LDFLAGS)  -I. -o $@ tests/$@.cpp tw_log.o testutils.o syscalls-$(ARCH).o $(TPLS) 
+	$(CXX) $(CFLAGS) -c -I. tests/testutils.cpp
+	$(CXX) $(CFLAGS) $(TWLIBFLAG) $(LD_TEST_FLAGS) $(LDFLAGS)  -I. -o $@ tests/$@.cpp tw_log.o testutils.o syscalls-$(ARCH).o $(TPLS) 
 
 test_log: tests/test_log.cpp tw_log.o syscalls-$(ARCH).o include/TW/tw_log.h
-	$(CC_PLUS) $(CFLAGS) $(LDFLAGS) -I. -o $@ tests/test_log.cpp tw_log.o syscalls-$(ARCH).o 
+	$(CXX) $(CFLAGS) $(LDFLAGS) -I. -o $@ tests/test_log.cpp tw_log.o syscalls-$(ARCH).o 
 
 test_alloc: tests/test_alloc.cpp tw_log.o syscalls-$(ARCH).o $(HDRS) tw_alloc.o
-	$(CC_PLUS) $(CFLAGS) $(LDFLAGS) -I. -o $@ tests/test_alloc.cpp tw_log.o syscalls-$(ARCH).o tw_alloc.o 
+	$(CXX) $(CFLAGS) $(LDFLAGS) -I. -o $@ tests/test_alloc.cpp tw_log.o syscalls-$(ARCH).o tw_alloc.o 
 
 test_sparsehash: tests/test_sparsehash.cpp tw_log.o tw_alloc.o syscalls-$(ARCH).o $(HDRS)
-	$(CC_PLUS) $(CFLAGS) $(LDFLAGS) -I. -o $@ tests/test_sparsehash.cpp tw_log.o syscalls-$(ARCH).o tw_alloc.o  
+	$(CXX) $(CFLAGS) $(LDFLAGS) -I. -o $@ tests/test_sparsehash.cpp tw_log.o syscalls-$(ARCH).o tw_alloc.o  
 
 test_densehash: tests/test_densehash.cpp tw_log.o tw_alloc.o syscalls-$(ARCH).o $(HDRS)
-	$(CC_PLUS) $(CFLAGS) $(LDFLAGS) -I. -o $@ tests/test_densehash.cpp tw_log.o syscalls-$(ARCH).o tw_alloc.o  
+	$(CXX) $(CFLAGS) $(LDFLAGS) -I. -o $@ tests/test_densehash.cpp tw_log.o syscalls-$(ARCH).o tw_alloc.o  
 
 test_autopointer: tests/autopointertest.cpp tw_log.o syscalls-$(ARCH).o include/TW/tw_log.h
-	$(CC_PLUS) $(CFLAGS) $(LDFLAGS) -I. -o $@ tests/autopointertest.cpp tw_log.o syscalls-$(ARCH).o 
+	$(CXX) $(CFLAGS) $(LDFLAGS) -I. -o $@ tests/autopointertest.cpp tw_log.o syscalls-$(ARCH).o 
 
 test_simple_khash: tests/simple_khashtest.c 
-	$(CC_PLUS) $(CFLAGS) $(LDFLAGS) -I. -o $@ tests/simple_khashtest.c tw_log.o syscalls-$(ARCH).o
+	$(CXX) $(CFLAGS) $(LDFLAGS) -I. -o $@ tests/simple_khashtest.c tw_log.o syscalls-$(ARCH).o
 
 test_khash: tests/test_khashtest.cpp include/TW/tw_khash.h include/TW/khash.h
-	$(CC_PLUS) $(CFLAGS) $(LDFLAGS) -I. $(TWLIBFLAG) -o $@ tests/test_khashtest.cpp tw_log.o syscalls-$(ARCH).o
+	$(CXX) $(CFLAGS) $(LDFLAGS) -I. $(TWLIBFLAG) -o $@ tests/test_khashtest.cpp tw_log.o syscalls-$(ARCH).o
 
 test_rbtree: tw_lib tests/test_rbtree.cpp include/TW/tw_rbtree.h include/TW/provos_rb_tree.h include/TW/tw_khash.h include/TW/khash.h
-	$(CC_PLUS) $(CFLAGS) $(LDFLAGS) -I. $(TWLIBFLAG) -o $@ tests/test_rbtree.cpp tw_log.o syscalls-$(ARCH).o
+	$(CXX) $(CFLAGS) $(LDFLAGS) -I. $(TWLIBFLAG) -o $@ tests/test_rbtree.cpp tw_log.o syscalls-$(ARCH).o
 
 test_hashes: tw_lib tests/test_hashes.cpp include/TW/tw_khash.h include/TW/khash.h
-	$(CC_PLUS) $(CFLAGS) $(LDFLAGS) $(LD_TEST_FLAGS) -I. $(TWLIBFLAG) -o $@ tests/test_hashes.cpp tw_log.o syscalls-$(ARCH).o
+	$(CXX) $(CFLAGS) $(LDFLAGS) $(LD_TEST_FLAGS) -I. $(TWLIBFLAG) -o $@ tests/test_hashes.cpp tw_log.o syscalls-$(ARCH).o
 
 install: tw_lib $(EXTRA_TARGET)
 	./install-sh $(TWSOVERSION) $(INSTALLPREFIX)
