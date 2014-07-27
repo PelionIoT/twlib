@@ -162,9 +162,11 @@ public:
 	~StackDump() {}
 
 	static StackDump *getStackTrace() {
+#ifdef _USING_GLIBC_
 		StackDump *ret = new StackDump();
 		ret->size = backtrace (ret->array, _TW_MAX_STACKTRACE);
 		return ret;
+#endif
 	}
 
 };
