@@ -12,6 +12,7 @@
 *.la
 *.a
 prereqs
+.prereqs
 expanded-prereqs
 #README.md#
 #README.md#
