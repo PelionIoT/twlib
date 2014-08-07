@@ -56,7 +56,7 @@ ifdef FREESCALE
 	CFLAGS+= -Lfreescale.out/expanded-prereqs/lib
 	OUTPUT_DIR=freescale.out
 else
-	CFLAGS+= -Lexpanded-prereqs/lib -Iexpanded-prereqs/include -I/usr/include  -fPIC
+	CFLAGS+= -Lexpanded-prereqs/lib -Iexpanded-prereqs/include  -fPIC
 endif
 
 GLIBCFLAG=-D_USING_GLIBC_
