@@ -3,7 +3,7 @@
  *
  *  Created on: Nov 25, 2011
  *      Author: ed
- * (c) 2011, WigWag LLC
+ * (c) 2014, WigWag Inc
  */
 
 #ifndef TW_HASHES_H_
@@ -29,6 +29,12 @@ struct hashInt {
 struct hash_uint32t {
 	inline size_t operator()(const uint32_t &x) const {
 		return (size_t) (x);
+	}
+};
+
+struct uint32_eqFunc {
+	inline int operator() (const uint32_t *l, const uint32_t *r) const {
+		return (*l == *r);
 	}
 };
 

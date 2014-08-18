@@ -166,6 +166,8 @@ public:
 		StackDump *ret = new StackDump();
 		ret->size = backtrace (ret->array, _TW_MAX_STACKTRACE);
 		return ret;
+#else
+		return NULL;
 #endif
 	}
 
