@@ -19,13 +19,95 @@
 #include <TW/tw_alloc.h>
 //#include "logging.h"
 
+#ifdef TWLIB_HAS_MOVE_SEMANTICS
+#include <utility>
+#endif
+
 #ifndef _TW_FIFO
 #define _TW_FIFO
 
 namespace TWlib {
 
+#ifdef TWLIB_HAS_MOVE_SEMANTICS
 
+/**
+ * Unlimited sized FIFO. This is a thread-safe, blocking queue using pthread conditions.
+ * T must support:
+ * self assignment: operator= (T &&a, T &&b)  rvalue assignment required (regular assignment *not* required)
+ * default constructor
+ */
+template <class T, class ALLOC >
+class tw_safeFIFOmv {
+public:
+	struct tw_FIFO_link {
+		T d;
+		tw_FIFO_link *next;
+//		tw_FIFO_link *prev;
+		tw_FIFO_link();
+		void init_link( T &the_d );
+		void init_link();
+	};
 
+	class iter {
+	public:
+		iter() : look(NULL) { }
+		bool getNext(T &fill);
+		bool atEnd();
+		friend class tw_safeFIFOmv;
+	protected:
+		tw_FIFO_link *look;
+	};
+
+	tw_safeFIFOmv( void );
+	tw_safeFIFOmv( ALLOC *_a );
+	tw_safeFIFOmv( tw_safeFIFOmv<T,ALLOC> &o );
+#ifdef _TW_WINDOWSs
+	tw_safeFIFOmv( HANDLE theHeap );
+#endif
+	void add( T &d );
+#if __cplusplus >= 201103L
+	void add( T &&d );
+#endif
+
+	void addToHead( T &d );
+	void transferFrom( tw_safeFIFOmv<T,ALLOC> &other ); // transfer record from other to 'this' - can block
+	bool transferFromNoBlock( tw_safeFIFOmv<T,ALLOC> &other ); // transfer record from other to 'this' -
+	                                               // wont block - false if would have blocked
+	T *addEmpty();
+	bool peek( T &fill ); // true if got valid value - look at next, dont remove
+	bool peekOrBlock( T &fill ); // true if got data - look at next, dont remove
+	bool peekOrBlock( T &fill, TimeVal &t );
+	bool remove( T &fill ); // true if got data
+	bool remove_mv( T &fill );
+	bool removeOrBlock( T &fill ); // true if removed something
+	bool removeOrBlock( T &fill, TimeVal &t );
+	void clearAll(); // remove all nodes (does not delete T)
+	void unblock();  // unblock 1 blocking call
+	void unblockAll(); // unblock all blocking calls
+	void disable();
+	void enable();
+	void startIter( iter &i );
+	tw_safeFIFOmv &operator=( const tw_safeFIFOmv &o );
+
+//	void removeAtIter( iter &i );
+	void releaseIter( iter &i );
+	int remaining();
+	~tw_safeFIFOmv();
+protected:
+	bool enabled; // if enabled the FIFO can take new values
+	pthread_mutex_t dataMutex; // thread safety for FIFO
+	pthread_cond_t newdataCond;
+	int _block_cnt;
+	int remain;
+	tw_FIFO_link *in; // add from this end (tail)
+	tw_FIFO_link *out; // remove from this end (head)
+	ALLOC *alloc;
+#ifdef _TW_WINDOWS
+	HANDLE hHeap;
+#endif
+};
+
+#endif
 /**
  * Unlimited sized FIFO. This is a thread-safe, blocking queue using pthread conditions.
  * T must support:
@@ -74,6 +156,7 @@ public:
 	bool peekOrBlock( T &fill ); // true if got data - look at next, dont remove
 	bool peekOrBlock( T &fill, TimeVal &t );
 	bool remove( T &fill ); // true if got data
+	bool remove_mv( T &fill );
 	bool removeOrBlock( T &fill ); // true if removed something
 	bool removeOrBlock( T &fill, TimeVal &t );
 	void clearAll(); // remove all nodes (does not delete T)
@@ -905,6 +988,31 @@ bool tw_safeFIFO<T,ALLOC>::remove( T &fill ) {
 }
 
 template <class T,class ALLOC>
+bool tw_safeFIFO<T,ALLOC>::remove_mv( T &fill ) {
+//	T ret = NULL; // TODO - this will not work if the argument is not a pointer - (fixed through operator =())
+	bool ret = false;
+	pthread_mutex_lock(&dataMutex);
+	if(in==out)
+		in = NULL;
+	if(out) {
+		ret = true;
+		fill = std::move(out->d);
+		tw_FIFO_link *oldout = out;
+		out = out->next;
+#ifdef _TW_WINDOWS
+		HeapFree( hHeap, 0, oldout );
+#else
+		ALLOC::free( oldout );
+#endif
+		remain--;
+	}
+	//	if(!out)
+	//	out = in;
+	pthread_mutex_unlock(&dataMutex);
+	return ret;
+}
+
+template <class T,class ALLOC>
 void tw_safeFIFO<T,ALLOC>::unblock( void ) { // unblock any waiting blocking calls
 	pthread_mutex_lock(&dataMutex);
 	// NOTE: linux seems to want to block on pthread_cond_signal. according to POSIX this should never happen
@@ -1115,6 +1223,544 @@ tw_safeFIFO<T,ALLOC>::~tw_safeFIFO() { // delete all remaining links (and hope s
 	pthread_mutex_destroy(&dataMutex);    // NEW
 	// Should call pthread_cond_destroy
 }
+
+/////////////////////////////////////////////////////////////////////////
+// thread safe FIFO mv (rvalue assignments)
+#ifdef TWLIB_HAS_MOVE_SEMANTICS
+
+template <class T,class ALLOC>
+tw_safeFIFOmv<T,ALLOC>::tw_FIFO_link::tw_FIFO_link(void) {
+//	d = (T *) NULL;
+	next = (tw_FIFO_link *) NULL;
+//	prev = (tw_FIFO_link *) NULL;
+}
+
+template <class T,class ALLOC>
+void tw_safeFIFOmv<T,ALLOC>::tw_FIFO_link::init_link( T &the_d ) {
+	::new((void*)&d) T(); // must explicity call the constructor
+	d = std::move(the_d);
+	next = (tw_FIFO_link *) NULL;
+//	prev = (tw_FIFO_link *) NULL;
+}
+
+template <class T,class ALLOC>
+void tw_safeFIFOmv<T,ALLOC>::tw_FIFO_link::init_link( ) {
+	::new((void*)&d) T(); // must explicity call the constructor
+	next = (tw_FIFO_link *) NULL;
+//	prev = (tw_FIFO_link *) NULL;
+}
+
+
+#ifdef _TW_WINDOWS
+template <class T,class ALLOC>
+tw_safeFIFOmv<T,ALLOC>::tw_safeFIFOmv( HANDLE theHeap ) : enabled( true ) {
+	alloc = NULL;
+	out = (tw_FIFO_link *) NULL;
+	in = (tw_FIFO_link *) NULL;
+	remain = 0;
+	hHeap = theHeap;
+}
+#endif
+
+template <class T,class ALLOC>
+tw_safeFIFOmv<T,ALLOC>::tw_safeFIFOmv( void ) : enabled( true ) {
+	alloc = NULL;
+	_block_cnt = 0;
+	pthread_mutex_init( &dataMutex, NULL );
+	pthread_cond_init( &newdataCond, NULL );
+	out = (tw_FIFO_link *) NULL;
+	in = (tw_FIFO_link *) NULL;
+	remain = 0;
+}
+
+
+template<class T, class ALLOC>
+tw_safeFIFOmv<T,ALLOC>::tw_safeFIFOmv(tw_safeFIFOmv<T,ALLOC> &o) : enabled( true ) {
+	alloc = NULL;
+	_block_cnt = 0;
+	pthread_mutex_init(&dataMutex, NULL);
+	pthread_cond_init(&newdataCond, NULL);
+	out = (tw_FIFO_link *) NULL;
+	in = (tw_FIFO_link *) NULL;
+	remain = 0;
+
+	*this = o;
+}
+
+template <class T,class ALLOC>
+tw_safeFIFOmv<T,ALLOC>::tw_safeFIFOmv( ALLOC *a ) : enabled( true ) {
+	alloc = a;
+	_block_cnt = 0;
+//	dataMutex = PTHREAD_MUTEX_INITIALIZER;
+//	newdataCond = PTHREAD_COND_INITIALIZER;
+	pthread_mutex_init( &dataMutex, NULL );
+	pthread_cond_init( &newdataCond, NULL );
+	out = (tw_FIFO_link *) NULL;
+	in = (tw_FIFO_link *) NULL;
+	remain = 0;
+}
+
+template <class T,class ALLOC>
+inline void tw_safeFIFOmv<T,ALLOC>::startIter( iter &i ) {
+	i.look = out;
+	pthread_mutex_lock(&dataMutex);
+}
+
+template <class T,class ALLOC>
+inline void tw_safeFIFOmv<T,ALLOC>::releaseIter( iter &i ) {
+	i.look = NULL;
+	pthread_mutex_unlock(&dataMutex);
+}
+
+// copies other tw_safeFIFOmv - does not copy Allocator
+template <class T,class ALLOC>
+tw_safeFIFOmv<T,ALLOC> &tw_safeFIFOmv<T,ALLOC>::operator=( const tw_safeFIFOmv<T,ALLOC> &o ) {
+	tw_FIFO_link *look;
+	tw_FIFO_link *prev;
+	tw_FIFO_link *newlink;
+
+	this->clearAll(); // clear anything that might be there
+
+	pthread_mutex_lock(const_cast<pthread_mutex_t *>(&(o.dataMutex)));
+	pthread_mutex_lock(&dataMutex);
+	this->enabled = o.enabled;
+	this->remain = 0;
+	/*
+#ifdef _TW_WINDOWS
+	newlink = (tw_FIFO_link *) HeapAlloc( hHeap, 0, sizeof( tw_FIFO_link ));
+#else
+	if(alloc)
+		newlink = (tw_FIFO_link *) alloc->malloc( sizeof( tw_FIFO_link ));
+	else
+		newlink = (tw_FIFO_link *) ACE_OS::malloc( sizeof( tw_FIFO_link ));
+#endif
+	newlink->init_link(the_d);
+*/
+	look = o.out;
+
+	if(look) {
+	newlink = (tw_FIFO_link *) ALLOC::malloc( sizeof( tw_FIFO_link ));
+	newlink->init_link(look->d);
+	prev = newlink;
+	this->out = newlink;
+	look = look->next;
+	this->remain++;
+	}
+
+	while(look) {
+		newlink = (tw_FIFO_link *) ALLOC::malloc( sizeof( tw_FIFO_link ));
+		newlink->init_link(look->d);
+		prev->next = newlink; // link to link behind us
+		prev = newlink;       // move forward
+		look = look->next;    // move the source forward
+		this->remain++;
+	}
+
+	this->in = prev;
+	pthread_mutex_unlock(const_cast<pthread_mutex_t *>(&(o.dataMutex)));
+	pthread_mutex_unlock(&dataMutex);
+	return *this;
+}
+
+/**
+ * enables the FIFO, allowing the adding of new items.
+ * Items already in the FIFO can be pulled out irregardless.
+ */
+template <class T,class ALLOC>
+void tw_safeFIFOmv<T,ALLOC>::enable() {
+	pthread_mutex_lock(&dataMutex);
+	enabled = true;
+	pthread_mutex_unlock(&dataMutex);
+}
+
+/**
+ * disables the FIFO, preventing the adding of new items.
+ * Items already in the FIFO can be pulled out.
+ */
+template <class T,class ALLOC>
+void tw_safeFIFOmv<T,ALLOC>::disable() {
+	pthread_mutex_lock(&dataMutex);
+	enabled = false;
+	pthread_mutex_unlock(&dataMutex);
+}
+
+template <class T,class ALLOC>
+void tw_safeFIFOmv<T,ALLOC>::add( T &the_d ) {
+	tw_FIFO_link *newlink;
+#ifdef _TW_WINDOWS
+	newlink = (tw_FIFO_link *) HeapAlloc( hHeap, 0, sizeof( tw_FIFO_link ));
+#else
+	newlink = (tw_FIFO_link *) ALLOC::malloc( sizeof( tw_FIFO_link ));
+#endif
+	newlink->init_link(the_d);
+//	newlink->prev=NULL;
+//	newlink->d = the_d;
+//	newlink->prev = in;
+	pthread_mutex_lock(&dataMutex);
+	if(enabled) {
+	if(in)
+		in->next = newlink;
+	in = newlink;
+	if(!out) {
+		out = in;
+	}
+	remain++;
+#ifdef _TW_FIFO_DEBUG_ON
+	TW_DEBUG_LT("tw_safeFIFOmv:add - blk_cnt: %d\n",_block_cnt);
+#endif
+	}
+#ifdef _TW_FIFO_DEBUG_ON
+	else
+		TW_DEBUG_LT("tw_safeFIFOmv: not enabled\n");
+#endif
+
+	pthread_mutex_unlock(&dataMutex);
+	unblock(); // let one blocking call know...
+}
+#if __cplusplus >= 201103L
+template <class T,class ALLOC>
+void tw_safeFIFOmv<T,ALLOC>::add( T &&the_d ) {
+	tw_FIFO_link *newlink;
+#ifdef _TW_WINDOWS
+	newlink = (tw_FIFO_link *) HeapAlloc( hHeap, 0, sizeof( tw_FIFO_link ));
+#else
+	newlink = (tw_FIFO_link *) ALLOC::malloc( sizeof( tw_FIFO_link ));
+#endif
+	newlink->init_link(the_d);
+//	newlink->prev=NULL;
+//	newlink->d = the_d;
+//	newlink->prev = in;
+	pthread_mutex_lock(&dataMutex);
+	if(enabled) {
+	if(in)
+		in->next = newlink;
+	in = newlink;
+	if(!out) {
+		out = in;
+	}
+	remain++;
+#ifdef _TW_FIFO_DEBUG_ON
+	TW_DEBUG_LT("tw_safeFIFOmv:add - blk_cnt: %d\n",_block_cnt);
+#endif
+	}
+#ifdef _TW_FIFO_DEBUG_ON
+	else
+		TW_DEBUG_LT("tw_safeFIFOmv: not enabled\n");
+#endif
+
+	pthread_mutex_unlock(&dataMutex);
+	unblock(); // let one blocking call know...
+}
+#endif
+
+template <class T,class ALLOC>
+void tw_safeFIFOmv<T,ALLOC>::addToHead( T &the_d ) {
+	tw_FIFO_link *newlink;
+//	newlink->prev=NULL;
+//	newlink->d = the_d;
+//	newlink->prev = in;
+	pthread_mutex_lock(&dataMutex);
+	if(enabled) {
+#ifdef _TW_WINDOWS
+	newlink = (tw_FIFO_link *) HeapAlloc( hHeap, 0, sizeof( tw_FIFO_link ));
+#else
+	newlink = (tw_FIFO_link *) ALLOC::malloc( sizeof( tw_FIFO_link ));
+#endif
+	newlink->init_link(the_d);
+
+//	if(in)
+//		in->next = newlink;
+//	in = newlink;
+	newlink->d = the_d;
+	if(!out) {
+		out = newlink;
+	} else {
+		newlink->next = out;
+		out = newlink;
+	}
+	if(!in)
+		in = out;
+	remain++;
+#ifdef _TW_FIFO_DEBUG_ON
+	TW_DEBUG_LT("tw_safeFIFOmv:add - blk_cnt: %d\n",_block_cnt);
+#endif
+
+	}
+#ifdef _TW_FIFO_DEBUG_ON
+	else
+		TW_DEBUG_LT("tw_safeFIFOmv: not enabled\n");
+#endif
+
+	pthread_mutex_unlock(&dataMutex);
+	unblock(); // let one blocking call know...
+}
+
+template <class T,class ALLOC>
+T *tw_safeFIFOmv<T,ALLOC>::addEmpty() {
+	tw_FIFO_link *newlink;
+//	newlink->prev=NULL;
+//	newlink->d = the_d;
+//	newlink->prev = in;
+	pthread_mutex_lock(&dataMutex);
+	if(enabled) {
+		newlink = (tw_FIFO_link *) ALLOC::malloc( sizeof( tw_FIFO_link ));
+		newlink->init_link();
+	if(in)
+		in->next = newlink;
+	in = newlink;
+	if(!out) {
+		out = in;
+	}
+	remain++;
+	}
+#ifdef _TW_FIFO_DEBUG_ON
+	else
+		TW_DEBUG_LT("tw_safeFIFOmv: not enabled\n");
+#endif
+	pthread_mutex_unlock(&dataMutex);
+	unblock(); // let one blocking call know...
+	return &(newlink->d);
+}
+
+
+template <class T,class ALLOC>
+bool tw_safeFIFOmv<T,ALLOC>::remove( T &fill ) {
+//	T ret = NULL; // TODO - this will not work if the argument is not a pointer - (fixed through operator =())
+	bool ret = false;
+	pthread_mutex_lock(&dataMutex);
+	if(in==out)
+		in = NULL;
+	if(out) {
+		ret = true;
+		fill = std::move(out->d);
+		tw_FIFO_link *oldout = out;
+		out = out->next;
+#ifdef _TW_WINDOWS
+		HeapFree( hHeap, 0, oldout );
+#else
+		ALLOC::free( oldout );
+#endif
+		remain--;
+	}
+	//	if(!out)
+	//	out = in;
+	pthread_mutex_unlock(&dataMutex);
+	return ret;
+}
+
+template <class T,class ALLOC>
+void tw_safeFIFOmv<T,ALLOC>::unblock( void ) { // unblock any waiting blocking calls
+	pthread_mutex_lock(&dataMutex);
+	// NOTE: linux seems to want to block on pthread_cond_signal. according to POSIX this should never happen
+	//       but the implementation seems to think otherwise...
+	//       This is why _block_cnt exists - we only .._signal() when at least 1 or more calls are blocking
+	if(_block_cnt > 0) {
+#ifdef _TW_FIFO_DEBUG_ON
+		TW_DEBUG_LT("pthread_cond_signal\n",NULL);
+#endif
+	pthread_cond_signal(&newdataCond); // let one (and only one) blocking call know to wakeup
+	_block_cnt--;
+	}
+	pthread_mutex_unlock(&dataMutex);
+}
+
+template <class T,class ALLOC>
+void tw_safeFIFOmv<T,ALLOC>::unblockAll( void ) { // unblock any waiting blocking calls
+	pthread_mutex_lock(&dataMutex);
+	if(_block_cnt > 0) {	// see unblock() about this var (above)
+	pthread_cond_broadcast(&newdataCond); // let all blocking calls know to wakeup
+	_block_cnt = 0;
+	}
+	pthread_mutex_unlock(&dataMutex);
+}
+
+
+template <class T,class ALLOC>
+bool tw_safeFIFOmv<T,ALLOC>::removeOrBlock( T &fill ) {
+	bool ret = false; // TODO - this will not work if the argument is not a pointer - (fixed through operator =())
+	pthread_mutex_lock(&dataMutex);
+	if(in==out) {
+		in = NULL;
+	}
+	if(!out) { // if no data... wait
+#ifdef _TW_FIFO_DEBUG_ON
+		TW_DEBUG_LT("pthread_cond_wait\n",NULL);
+#endif
+		_block_cnt++; // see unblock() for details
+		pthread_cond_wait( &newdataCond, &dataMutex ); // wait until new data arrives
+#ifdef _TW_FIFO_DEBUG_ON
+		TW_DEBUG_LT("pthread out\n",NULL);
+#endif
+	}
+	if(in==out) { // this check must be done again
+		in = NULL;
+	}
+	if(out) {
+		ret = true;
+		fill = std::move(out->d);
+		tw_FIFO_link *oldout = out;
+		out = out->next;
+#ifdef _TW_WINDOWS
+		HeapFree( hHeap, 0, oldout );
+#else
+		ALLOC::free( oldout );
+#endif
+		remain--;
+	}
+	//	if(!out)
+	//	out = in;
+	pthread_mutex_unlock(&dataMutex);
+	return ret;
+}
+
+template <class T,class ALLOC>
+bool tw_safeFIFOmv<T,ALLOC>::removeOrBlock( T &fill, TimeVal &t ) {
+	bool ret = false; // TODO - this will not work if the argument is not a pointer - (fixed through operator =())
+	pthread_mutex_lock(&dataMutex);
+	if(in==out) {
+		in = NULL;
+	}
+	if(!out) { // if no data... wait
+#ifdef _TW_FIFO_DEBUG_ON
+		TW_DEBUG_LT("pthread_cond_wait\n",NULL);
+#endif
+		_block_cnt++; // see unblock() for details
+		int err = pthread_cond_timedwait( &newdataCond, &dataMutex, t.timespec() ); // wait until new data arrives
+#ifdef _TW_FIFO_DEBUG_ON
+		TW_DEBUG_LT("pthread out\n",NULL);
+#endif
+		if(err==ETIMEDOUT) {
+#ifdef _TW_FIFO_DEBUG_ON
+		TW_DEBUG_LT("pthread_cond_timedwait - ETIMEDOUT\n",NULL);
+#endif
+			pthread_mutex_unlock(&dataMutex);
+			return false;
+		}
+	}
+	if(in==out) { // this check must be done again
+		in = NULL;
+	}
+	if(out) {
+		ret = true;
+		fill = out->d;
+		tw_FIFO_link *oldout = out;
+		out = out->next;
+#ifdef _TW_WINDOWS
+		HeapFree( hHeap, 0, oldout );
+#else
+		ALLOC::free( oldout );
+#endif
+		remain--;
+	}
+	//	if(!out)
+	//	out = in;
+	pthread_mutex_unlock(&dataMutex);
+	return ret;
+}
+
+template <class T,class ALLOC>
+bool tw_safeFIFOmv<T,ALLOC>::peek( T &fill ) {
+	bool ret = false;
+	//	if(in==out)
+	//	in = NULL;
+	pthread_mutex_lock(&dataMutex);
+	if(out) {
+		ret = true;
+		fill = out->d;
+	}
+	pthread_mutex_unlock(&dataMutex);
+	return ret;
+}
+
+template <class T,class ALLOC>
+bool tw_safeFIFOmv<T,ALLOC>::peekOrBlock( T &fill ) {
+	bool ret = false;
+	//	if(in==out)
+	//	in = NULL;
+	pthread_mutex_lock(&dataMutex);
+	if(!out) {
+		_block_cnt++;
+		pthread_cond_wait( &newdataCond, &dataMutex ); // wait until new data arrives
+	}
+	if(out) {
+		ret = true;
+		fill = out->d;
+	}
+	pthread_mutex_unlock(&dataMutex);
+	return ret;
+}
+
+template <class T,class ALLOC>
+bool tw_safeFIFOmv<T,ALLOC>::peekOrBlock( T &fill, TimeVal &t ) {
+	bool ret = false;
+	//	if(in==out)
+	//	in = NULL;
+	pthread_mutex_lock(&dataMutex);
+	if(!out) {
+		_block_cnt++;
+		int err = pthread_cond_timedwait( &newdataCond, &dataMutex, t.timespec() ); // wait until new data arrives
+		if(err == ETIMEDOUT) { // if timeout, don't look at value.
+#ifdef _TW_FIFO_DEBUG_ON
+		TW_DEBUG_LT("pthread_cond_timedwait - peek ETIMEDOUT\n",NULL);
+#endif
+			pthread_mutex_unlock(&dataMutex);
+			return false;
+		}
+	}
+	if(out) {
+		ret = true;
+		fill = out->d;
+	}
+	pthread_mutex_unlock(&dataMutex);
+	return ret;
+}
+
+template <class T,class ALLOC>
+int tw_safeFIFOmv<T,ALLOC>::remaining(void) {
+	int ret;
+	pthread_mutex_lock(&dataMutex);
+	ret = remain;
+	pthread_mutex_unlock(&dataMutex);
+	return remain;
+
+}
+
+template <class T,class ALLOC>
+void tw_safeFIFOmv<T,ALLOC>::clearAll() { // delete all remaining links (and hope someone took care of the data in each of those)
+	int ret;
+	tw_FIFO_link *n = NULL;
+	pthread_mutex_lock(&dataMutex);
+	while(out) {
+		n = out->next;
+		ALLOC::free(out);
+		out = n;
+	}
+
+	out = (tw_FIFO_link *) NULL;
+	in = (tw_FIFO_link *) NULL;
+	remain = 0;
+	pthread_mutex_unlock(&dataMutex);
+	unblockAll();
+}
+
+
+template <class T,class ALLOC>
+tw_safeFIFOmv<T,ALLOC>::~tw_safeFIFOmv() { // delete all remaining links (and hope someone took care of the data in each of those)
+	tw_FIFO_link *n = NULL;
+	unblockAll();
+	pthread_mutex_lock(&dataMutex);
+	while(out) {
+		n = out->next;
+		ALLOC::free(out);
+		out = n;
+	}
+	pthread_cond_destroy(&newdataCond);   // NEW
+	pthread_mutex_unlock(&dataMutex);
+	pthread_mutex_destroy(&dataMutex);    // NEW
+	// Should call pthread_cond_destroy
+}
+
+#endif // TWLIB_HAS_MOVE_SEMANTICS
 
 /////////////////////////////////////////////////////
 //// TW_bndSafeFIFO
