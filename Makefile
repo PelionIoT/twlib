@@ -21,7 +21,7 @@ ALLOBJS= $($<:%.cpp=%.o)
 
 DEBUG_OPTIONS=-rdynamic -D_TW_TASK_DEBUG_THREADS_ 
 #-D_TW_BUFBLK_DEBUG_STACK_
-CFLAGS= $(DEBUG_OPTIONS) $(GLIBCFLAG) -D_TW_DEBUG -I./include  -D__DEBUG   -fPIC
+CFLAGS= $(DEBUG_OPTIONS) $(GLIBCFLAG) -D_TW_DEBUG -I./include  -D__DEBUG   -fPIC -std=c++11
 
 CROSS_PREREQ_LIBS=freescale.out/expanded-prereqs/lib
 CROSS_PREREQ_HEADERS=freescale.out/expanded-prereqs/include
