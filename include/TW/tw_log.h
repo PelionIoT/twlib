@@ -53,6 +53,8 @@
 #define TW_PRE_LINE "(%s:%d) "
 #define TW_PRE_LINE_THREAD "(%s:%d,lwp:%d) "
 
+// TW_OVERRIDE_LOG allows you to disable the logging or replace it.
+#ifndef TW_OVERRIDE_LOG
 // if TWLOG_PRINT_MODULENAME is defined then every log entry will have the file/line number of where the log call was made
 #ifdef TWLOG_PRINT_MODULENAME
 #define TW_NOTIFY( s, ... )  TWlib::TW_log::log( TW_LL_NOTIFY, TW_PREFIX_NOTIFY TW_PRE_LINE s, __FILE__, __LINE__, __VA_ARGS__ )
@@ -79,6 +81,43 @@
 #define TW_DEBUG_LT( s, ... )  TWlib::TW_log::log( TW_LL_DEBUG1, TW_PREFIX_DEBUG TW_PRE_LINE_THREAD s, __FILE__, __LINE__, _TW_LWP_, __VA_ARGS__ )
 #endif
 
+#else
+
+#ifndef TW_NOTIFY
+#define TW_NOTIFY {}
+#endif
+#ifndef TW_CONFIG
+#define TW_CONFIG {}
+#endif
+#ifndef TW_WARN
+#define TW_WARN {}
+#pragma message "twlib NOTE: TW_WARN is disabled."
+#endif
+#ifndef TW_ERROR
+#define TW_ERROR {}
+#pragma message "twlib NOTE: TW_ERROR is disabled. Important messages failures may not print out."
+#endif
+#ifndef TW_CRASH
+#define TW_CRASH {}
+#pragma message "twlib NOTE: TW_CRASH is disabled."
+#endif
+#ifndef TW_CRASH_LT
+#define TW_CRASH_LT {}
+#pragma message "twlib NOTE: TW_CRASH_LT is disabled."
+#endif
+#ifndef TW_DEBUG
+#define TW_DEBUG {}
+#endif
+#ifndef TW_DEBUG_LT
+#define TW_DEBUG_LT {}
+#endif
+#ifndef TW_DEBUG_L
+#define TW_DEBUG_L {}
+#endif
+
+#endif
+
+#ifndef TW_OVERRIDE_LOG
 namespace TWlib {
 
 
@@ -187,4 +226,6 @@ public:
 
 
 }
+#endif // TW_OVERRIDE_LOG
+
 #endif /* TW_LOG_H_ */

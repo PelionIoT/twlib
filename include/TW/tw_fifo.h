@@ -26,6 +26,7 @@
 #ifndef _TW_FIFO
 #define _TW_FIFO
 
+
 namespace TWlib {
 
 #ifdef TWLIB_HAS_MOVE_SEMANTICS
@@ -50,8 +51,9 @@ public:
 
 	class iter {
 	public:
-		iter() : look(NULL) { }
-		bool getNext(T &fill);
+		iter() : look(NULL) { };
+		T &el();
+		void next();
 		bool atEnd();
 		friend class tw_safeFIFOmv;
 	protected:
@@ -156,7 +158,9 @@ public:
 	bool peekOrBlock( T &fill ); // true if got data - look at next, dont remove
 	bool peekOrBlock( T &fill, TimeVal &t );
 	bool remove( T &fill ); // true if got data
+#ifdef TWLIB_HAS_MOVE_SEMANTICS
 	bool remove_mv( T &fill );
+#endif
 	bool removeOrBlock( T &fill ); // true if removed something
 	bool removeOrBlock( T &fill, TimeVal &t );
 	void clearAll(); // remove all nodes (does not delete T)
@@ -332,6 +336,36 @@ inline bool tw_FIFO<T,ALLOC>::iter::atEnd() {
 		return true;
 }
 
+#ifdef TWLIB_HAS_MOVE_SEMANTICS
+
+template <class T,class ALLOC>
+T &tw_safeFIFOmv<T,ALLOC>::iter::el() {
+	if(look) {
+		return look->d;
+	} else {
+		TW_ERROR("tw_safeFIFOmv --- went past end of list\n",NULL);
+#ifdef __EXCEPTIONS
+		throw false;
+#endif
+	}
+}
+
+template <class T,class ALLOC>
+void tw_safeFIFOmv<T,ALLOC>::iter::next() {
+	if(look)
+		look = look->next;
+}
+
+
+template <class T,class ALLOC>
+inline bool tw_safeFIFOmv<T,ALLOC>::iter::atEnd() {
+	if(look)
+		return false;
+	else
+		return true;
+}
+
+#endif
 
 
 template <class T,class ALLOC>
@@ -987,6 +1021,7 @@ bool tw_safeFIFO<T,ALLOC>::remove( T &fill ) {
 	return ret;
 }
 
+#ifdef TWLIB_HAS_MOVE_SEMANTICS
 template <class T,class ALLOC>
 bool tw_safeFIFO<T,ALLOC>::remove_mv( T &fill ) {
 //	T ret = NULL; // TODO - this will not work if the argument is not a pointer - (fixed through operator =())
@@ -1011,6 +1046,7 @@ bool tw_safeFIFO<T,ALLOC>::remove_mv( T &fill ) {
 	pthread_mutex_unlock(&dataMutex);
 	return ret;
 }
+#endif
 
 template <class T,class ALLOC>
 void tw_safeFIFO<T,ALLOC>::unblock( void ) { // unblock any waiting blocking calls
