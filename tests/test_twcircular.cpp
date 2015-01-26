@@ -21,17 +21,17 @@
 #include <TW/tw_utils.h>
 #include <TW/tw_alloc.h>
 #include <TW/tw_sema.h>
-#include <TW/tw_fifo.h>
+#include <TW/tw_circular.h>
 
 void *print_message_function( void *ptr );
 
-#define QUEUE_SIZE 10
-#define RUN_SIZE 40
+#define QUEUE_SIZE 100
+#define RUN_SIZE 400
 
 #define CONSUMER_THREADS 4
 #define PRODUCER_THREADS 4
 
-#define START_VAL 100
+#define START_VAL 0
 
 int TOTAL = RUN_SIZE;
 TW_Mutex *totalMutex;
@@ -61,6 +61,8 @@ using namespace TWlib;
 
 typedef Allocator<Alloc_Std> TESTAlloc;
 
+int OUTPUT[PRODUCER_THREADS];
+
 class threadinfo {
 public:
 	int threadnum;
@@ -69,22 +71,22 @@ public:
 
 void *producer( void *ptr ) {
 	threadinfo *inf = reinterpret_cast<threadinfo *>(ptr);
-	tw_bndSafeFIFO<int, TESTAlloc > *Q = reinterpret_cast<tw_bndSafeFIFO<int,  TESTAlloc > *>(inf->p);
+	tw_safeCircular<int, TESTAlloc > *Q = reinterpret_cast<tw_safeCircular<int, TESTAlloc > *>(inf->p);
 	int x = RUN_SIZE / PRODUCER_THREADS;
 	int val = START_VAL;
 	while(x > 0) {
 		val++;
 		x--;
+		printf(">>> Producer %d: adding %d\n\n", inf->threadnum, val);
 		Q->add(val);
-		printf("Creator %d: added %d\n", inf->threadnum, val);
 	}
 }
 
 void *consumer( void *ptr ) {
 	threadinfo *inf = reinterpret_cast<threadinfo *>(ptr);
-	tw_bndSafeFIFO<int, TESTAlloc > *Q = reinterpret_cast<tw_bndSafeFIFO<int, TESTAlloc > *>(inf->p);
+	tw_safeCircular<int, TESTAlloc > *Q = reinterpret_cast<tw_safeCircular<int, TESTAlloc > *>(inf->p);
 	int x = RUN_SIZE / CONSUMER_THREADS;
-
+	int cnt = 0;
 	int val = 0;
 	int tc = 0;
 	while(x > 0) {
@@ -96,15 +98,19 @@ void *consumer( void *ptr ) {
 //			break;
 //		}
 		if(Q->removeOrBlock(val)) {
-			printf("Consumer %d: removed %d\n",inf->threadnum, val);
+			cnt++;
+			printf("<<< Consumer %d: removed %d\n\n",inf->threadnum, val);
 			TOTAL--;
 		} else {
-			printf("Consumer %d: error - bad remove\n", inf->threadnum);
+			printf("<<< Consumer %d: error - bad remove\n\n", inf->threadnum);
 		}
 //		totalMutex->release();
 		x--;
 	}
+	printf("Consumer %d done!!!\n", inf->threadnum);
+	OUTPUT[inf->threadnum] = cnt;
 }
+
 
 
 int main()
@@ -113,11 +119,15 @@ int main()
 	pthread_t consumert[CONSUMER_THREADS];
 	pthread_t producert[PRODUCER_THREADS];
 
+
+	for (int x=0;x<CONSUMER_THREADS;x++)
+		OUTPUT[x] = 0;
+
      int  iret1, iret2, iret3;
      totalMutex = new TW_Mutex();
 
 
-     tw_bndSafeFIFO<int, TESTAlloc > theQ( QUEUE_SIZE );
+     tw_safeCircular<int, TESTAlloc > theQ( QUEUE_SIZE );
 
     /* Create independent threads each of which will execute function */
 	 threadinfo *inf;
@@ -159,6 +169,13 @@ int main()
 
  //    printf("Thread 1 returns: %d\n",iret1);
   //   printf("Thread 2 returns: %d\n",iret2);
+
+ 	for (int x=0;x<CONSUMER_THREADS;x++) {
+ 		printf("Thread num %d -> output %d\n", x, OUTPUT[x]);
+ 	}
+
+
+
      exit(0);
 }
 

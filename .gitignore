@@ -18,6 +18,6 @@ expanded-prereqs
 #README.md#
 libTW.so.1
 libTW.so.1.0.1
-libTW.so.1.0.1
-libTW.so.1
 test_rbtree
+/test_tw_sema
+/test_twcircular
