@@ -112,10 +112,11 @@ protected:
 		if(full) nextOut = nextNextOut();
 		int n = nextIn + 1;
 		if(n >= _size) n = 0;
-		if(nextIn == nextOut) full = true;
+		if(n == nextOut) full = true;
 		return n;
 	}
 	int nextNextOut() {
+		full = false;
 		int n = nextOut + 1;
 		if(n >= _size) n = 0;
 		return n;
@@ -124,6 +125,7 @@ protected:
 		if(full) return _size;
 		if(nextIn < 0) return 0;
 		if(nextOut <= nextIn) return nextIn-nextOut;
+		else return _size - (nextOut - nextIn);
 	}
 	int nextIn;   // position to place next in value
 	int nextOut;  // position to pull next out value
@@ -415,12 +417,15 @@ bool tw_safeCircular<T,ALLOC>::removeOrBlock( T &fill ) {
 	TW_CIRCULAR_DBG_OUT("removeOrBlock.. remain = %d", remain());
 	if(remain() > 0) {
 		sema->releaseWithoutLock();
+		TW_CIRCULAR_DBG_OUT("   ...removeOrBlock(2).. remain = %d", remain());
 		nextOut = nextNextOut();
 		fill = data[nextOut];
 		sema->releaseSemaLock();
 	} else {
-		TW_CIRCULAR_DBG_OUT("waitForAcquirers - removeOrBlock (%d)", remain());
-		sema->waitForAcquirersKeepLock(false);
+		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(%d) waitForAcquirers", remain());
+		sema->waitForAcquirersKeepLock(false); // unlocks while waiting for acquire
+		TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers complete. remain = %d", remain());
+		sema->releaseWithoutLock();
 		nextOut = nextNextOut();
 		fill = data[nextOut];
 		sema->releaseSemaLock();

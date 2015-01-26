@@ -65,7 +65,7 @@ public:
 		pthread_mutex_lock( &localMutex );
 		while(cnt < 1) {
 #ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA wait [%x]\n",this);
+			printf ("TW_SEMA wait (acquire) [%x]\n",this);
 #endif
 			ret = pthread_cond_wait( &gtZeroCond, &localMutex ); // wait for change in cnt
 		}
@@ -80,7 +80,7 @@ public:
 		pthread_mutex_lock( &localMutex );
 		while(1) {
 #ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA wait (cnt=%d) [%x]\n",cnt, this);
+			printf ("TW_SEMA acquire wait (cnt=%d) [%x]\n",cnt, this);
 #endif
 			if(cnt >= 1) break;
 			ret = pthread_cond_wait( &gtZeroCond, &localMutex ); // wait for change in cnt
@@ -104,7 +104,7 @@ public:
 		if(lock)
 			pthread_mutex_lock( &localMutex );
 		while(1) {
-			if(cnt >= 1)
+			if(cnt >= size)
 				ret = pthread_cond_wait( &decrementCond, &localMutex );
 		}
 		pthread_mutex_unlock( &localMutex );
@@ -116,15 +116,13 @@ public:
 		if(lock)
 			pthread_mutex_lock( &localMutex );
 		while(1) {
-			if(cnt >= size) {
+			if(cnt < size) break;
 #ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA wait decrement (cnt=%d) [%x]\n",cnt, this);
+			printf ("TW_SEMA waitForAcquirers decrement (cnt=%d) [%x]\n",cnt, this);
 			if(cnt > size) printf("EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEK!!!\n");
 #endif
-				ret = pthread_cond_wait( &decrementCond, &localMutex );
-			}
-			else
-				break;
+			ret = pthread_cond_wait( &decrementCond, &localMutex );
+			printf ("TW_SEMA got decrement (cnt=%d)\n",cnt);
 		}
 		return ret;
 	}
@@ -251,7 +249,7 @@ public:
 		int ret = 0;
 		pthread_mutex_lock( &localMutex );
 #ifdef _TW_SEMA_HEAVY_DEBUG
-		printf ("TW_SEMA incrementing [%x]\n",this);
+		printf ("TW_SEMA (release) incrementing [%x]\n",this);
 #endif
 		cnt++;
 		if(cnt > 0) { // the 'if' should not be necessary
@@ -269,7 +267,7 @@ public:
 		int ret = 0;
 		cnt++;
 #ifdef _TW_SEMA_HEAVY_DEBUG
-		printf ("TW_SEMA incrementing [%x]\n",this);
+		printf ("TW_SEMA (release) incrementing (%d) [%x]\n",cnt, this);
 #endif
 		if(cnt > 0) { // the 'if' should not be necessary
 			ret = pthread_cond_signal( &gtZeroCond );
@@ -287,7 +285,7 @@ public:
 		int ret = 0;
 		pthread_mutex_lock( &localMutex );
 #ifdef _TW_SEMA_HEAVY_DEBUG
-		printf ("TW_SEMA incrementing [%x]\n",this);
+		printf ("TW_SEMA (release) incrementing [%x]\n",this);
 #endif
 		cnt++;
 		if(cnt > 0) // the 'if' should not be necessary

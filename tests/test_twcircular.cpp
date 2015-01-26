@@ -25,11 +25,12 @@
 
 void *print_message_function( void *ptr );
 
-#define QUEUE_SIZE 100
-#define RUN_SIZE 400
+#define QUEUE_SIZE 20
+#define RUN_SIZE 200
 
 #define CONSUMER_THREADS 4
-#define PRODUCER_THREADS 4
+#define PRODUCER_THREADS 2
+
 
 #define START_VAL 0
 
@@ -69,26 +70,36 @@ public:
 	void *p; // some data
 };
 
+class data {
+public:
+	int x;
+	data() : x(0) {}
+	data(data &o) : x(o.x) {}
+
+};
+
 void *producer( void *ptr ) {
 	threadinfo *inf = reinterpret_cast<threadinfo *>(ptr);
-	tw_safeCircular<int, TESTAlloc > *Q = reinterpret_cast<tw_safeCircular<int, TESTAlloc > *>(inf->p);
+	tw_safeCircular<data, TESTAlloc > *Q = reinterpret_cast<tw_safeCircular<data, TESTAlloc > *>(inf->p);
 	int x = RUN_SIZE / PRODUCER_THREADS;
 	int val = START_VAL;
+	data D;
 	while(x > 0) {
 		val++;
 		x--;
 		printf(">>> Producer %d: adding %d\n\n", inf->threadnum, val);
-		Q->add(val);
+		D.x = val;
+		Q->add(D);
 	}
 }
 
 void *consumer( void *ptr ) {
 	threadinfo *inf = reinterpret_cast<threadinfo *>(ptr);
-	tw_safeCircular<int, TESTAlloc > *Q = reinterpret_cast<tw_safeCircular<int, TESTAlloc > *>(inf->p);
+	tw_safeCircular<data, TESTAlloc > *Q = reinterpret_cast<tw_safeCircular<data, TESTAlloc > *>(inf->p);
 	int x = RUN_SIZE / CONSUMER_THREADS;
 	int cnt = 0;
-	int val = 0;
 	int tc = 0;
+	data D;
 	while(x > 0) {
 		// this also works...
 //		totalMutex->acquire();
@@ -97,9 +108,9 @@ void *consumer( void *ptr ) {
 //			totalMutex->release();
 //			break;
 //		}
-		if(Q->removeOrBlock(val)) {
+		if(Q->removeOrBlock(D)) {
 			cnt++;
-			printf("<<< Consumer %d: removed %d\n\n",inf->threadnum, val);
+			printf("<<< Consumer %d: removed %d\n\n",inf->threadnum, D.x);
 			TOTAL--;
 		} else {
 			printf("<<< Consumer %d: error - bad remove\n\n", inf->threadnum);
@@ -127,7 +138,7 @@ int main()
      totalMutex = new TW_Mutex();
 
 
-     tw_safeCircular<int, TESTAlloc > theQ( QUEUE_SIZE );
+     tw_safeCircular<data, TESTAlloc > theQ( QUEUE_SIZE, true );
 
     /* Create independent threads each of which will execute function */
 	 threadinfo *inf;
