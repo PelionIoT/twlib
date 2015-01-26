@@ -73,7 +73,7 @@ public:
 #endif
 	void add( T &d );
 #ifdef TWLIB_HAS_MOVE_SEMANTICS
-	void add( T &&d );
+	void addMv( T &d );
 #endif
 
 	void transferFrom( tw_safeCircular<T,ALLOC> &other ); // transfer record from other to 'this' - can block
@@ -367,11 +367,12 @@ void tw_safeCircular<T,ALLOC>::add( T &the_d ) {
 
 #ifdef TWLIB_HAS_MOVE_SEMANTICS
 template <class T,class ALLOC>
-void tw_safeCircular<T,ALLOC>::add( T &&the_d ) {
+void tw_safeCircular<T,ALLOC>::addMv( T &the_d ) {
 	TW_CIRCULAR_DBG_OUT("acquireAndKeepLock - add(move)");
 	sema->acquireAndKeepLock();
 	nextIn = nextNextIn();
 	data[nextIn] = std::move(the_d);
+	TW_CIRCULAR_DBG_OUT("remain post-add(): %d",remain());
 	sema->releaseSemaLock();
 //	unblock(); // let one blocking call know...
 }
@@ -438,19 +439,39 @@ template <class T,class ALLOC>
 bool tw_safeCircular<T,ALLOC>::remove_mvOrBlock( T &fill ) {
 	bool ret = true;
 	sema->lockSemaOnly();
+	TW_CIRCULAR_DBG_OUT("removeOrBlock.. remain = %d", remain());
 	if(remain() > 0) {
 		sema->releaseWithoutLock();
+		TW_CIRCULAR_DBG_OUT("   ...removeOrBlock(2).. remain = %d", remain());
 		nextOut = nextNextOut();
 		fill = std::move(data[nextOut]);
 		sema->releaseSemaLock();
 	} else {
-		TW_CIRCULAR_DBG_OUT("waitForDecrement - remove_mvOrBlock");
-		sema->waitForAcquirersKeepLock(false);
+		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(%d) waitForAcquirers", remain());
+		sema->waitForAcquirersKeepLock(false); // unlocks while waiting for acquire
+		TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers complete. remain = %d", remain());
+		sema->releaseWithoutLock();
 		nextOut = nextNextOut();
 		fill = std::move(data[nextOut]);
 		sema->releaseSemaLock();
 	}
 	return ret;
+
+//	bool ret = true;
+//	sema->lockSemaOnly();
+//	if(remain() > 0) {
+//		sema->releaseWithoutLock();
+//		nextOut = nextNextOut();
+//		fill = std::move(data[nextOut]);
+//		sema->releaseSemaLock();
+//	} else {
+//		TW_CIRCULAR_DBG_OUT("waitForDecrement - remove_mvOrBlock");
+//		sema->waitForAcquirersKeepLock(false);
+//		nextOut = nextNextOut();
+//		fill = std::move(data[nextOut]);
+//		sema->releaseSemaLock();
+//	}
+//	return ret;
 }
 #endif
 
