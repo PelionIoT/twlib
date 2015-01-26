@@ -1,11 +1,13 @@
 
 // tupperware container lib
+#ifndef _TW_CIRCULAR
+#define _TW_CIRCULAR
 
 // FIFO: a simple class to handle a fifo list of void pointers.
 #include <pthread.h>
 #include <errno.h>
 
-#include <TW/tw_log.h>
+//#include <TW/tw_log.h>
 
 // #ifdef 'g++' whatever that is...
 #include <new>
@@ -23,8 +25,6 @@
 #include <utility>
 #endif
 
-#ifndef _TW_FIFO
-#define _TW_FIFO
 
 #define DEBUG_TW_CIRCULAR_H
 
