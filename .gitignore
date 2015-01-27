@@ -22,3 +22,4 @@ test_rbtree
 /test_tw_sema
 /test_twcircular
 /test_twcircular_mv
+/test_twcircular_mv_noblock
