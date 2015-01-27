@@ -68,9 +68,40 @@ public:
 			printf ("TW_SEMA wait (acquire) [%p]\n",this);
 #endif
 			ret = pthread_cond_wait( &gtZeroCond, &localMutex ); // wait for change in cnt
+			if(ret) {
+#ifdef _TW_SEMA_HEAVY_DEBUG
+				printf ("TW_SEMA acquire error (errno %d) (cnt=%d) [%p]\n",ret, cnt, this);
+#endif
+				break;
+			}
 		}
-		cnt--;
-		pthread_cond_signal( &decrementCond );
+		if(!ret) {
+			cnt--;
+			pthread_cond_signal( &decrementCond );
+		}
+		pthread_mutex_unlock( &localMutex );
+		return ret;
+	}
+
+	int acquire(const struct timespec *abstime) {
+		int ret = 0;
+		pthread_mutex_lock( &localMutex );
+		while(cnt < 1) {
+#ifdef _TW_SEMA_HEAVY_DEBUG
+			printf ("TW_SEMA wait (acquire) [%p]\n",this);
+#endif
+			ret = pthread_cond_timedwait( &gtZeroCond, &localMutex, abstime ); // wait for change in cnt
+			if(ret) {
+#ifdef _TW_SEMA_HEAVY_DEBUG
+				printf ("TW_SEMA acquire error (errno %d) (cnt=%d) [%p]\n",ret, cnt, this);
+#endif
+				break;
+			}
+		}
+		if(!ret) {
+			cnt--;
+			pthread_cond_signal( &decrementCond );
+		}
 		pthread_mutex_unlock( &localMutex );
 		return ret;
 	}
@@ -84,10 +115,75 @@ public:
 #endif
 			if(cnt >= 1) break;
 			ret = pthread_cond_wait( &gtZeroCond, &localMutex ); // wait for change in cnt
+			if(ret) {
+#ifdef _TW_SEMA_HEAVY_DEBUG
+				printf ("TW_SEMA acquire error (errno %d) (cnt=%d) [%p]\n",ret, cnt, this);
+#endif
+				break;
+			}
 		}
-		cnt--;
-		pthread_cond_signal( &decrementCond );
+		if(!ret) {
+			cnt--;
+			pthread_cond_signal( &decrementCond );
+		}
 		return ret;
+	}
+
+	bool acquireAndKeepLockNoBlock() {
+		bool ret = false;
+		pthread_mutex_lock( &localMutex );
+		if(cnt >= 1) {
+			cnt--;
+			pthread_cond_signal( &decrementCond );
+			ret = true;
+		}
+		return ret;
+	}
+
+	int acquireAndKeepLock(const struct timespec *abstime) {
+		int ret = 0;
+		pthread_mutex_lock( &localMutex );
+		while(1) {
+#ifdef _TW_SEMA_HEAVY_DEBUG
+			printf ("TW_SEMA acquire wait (cnt=%d) [%p]\n",cnt, this);
+#endif
+			if(cnt >= 1) break;
+			ret = pthread_cond_timedwait( &gtZeroCond, &localMutex, abstime ); // wait for change in cnt
+			if(ret) {
+#ifdef _TW_SEMA_HEAVY_DEBUG
+				printf ("TW_SEMA acquire error or timeout (errno %d) (cnt=%d) [%p]\n",ret, cnt, this);
+#endif
+				break;
+			}
+		}
+		if(!ret) {
+			cnt--;
+			pthread_cond_signal( &decrementCond );
+		}
+		return ret;
+	}
+
+	/**
+	 * An easier to use acquire waiting for a given number of microseconds.
+	 * @param usec_wait
+	 * @return
+	 */
+	int acquire(const int64_t usec_wait ) {
+		timeval tv;
+		timespec ts;
+		gettimeofday(&tv, NULL);
+		TWlib::add_usec_to_timeval(usec_wait, &tv);
+		TWlib::timeval_to_timespec(&tv,&ts);
+		return acquire( &ts );
+	}
+
+	int acquireAndKeepLock(const int64_t usec_wait ) {
+		timeval tv;
+		timespec ts;
+		gettimeofday(&tv, NULL);
+		TWlib::add_usec_to_timeval(usec_wait, &tv);
+		TWlib::timeval_to_timespec(&tv,&ts);
+		return acquireAndKeepLock( &ts );
 	}
 
 	void lockSemaOnly() {
@@ -229,71 +325,50 @@ public:
 	 * @param abstime
 	 * @return
 	 */
-	int acquire(const struct timespec *abstime) {
-		int ret = 0;
-		pthread_mutex_lock( &localMutex );
-		if(cnt < 1) {
-#ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA timedwait [%p]\n",this);
-#endif
-			ret = pthread_cond_timedwait( &gtZeroCond, &localMutex, abstime ); // wait for change in cnt
-			if(ret == 0) {// if we waited successfully, and no timeout
-				cnt--;   //   the decrement the count down one
-#ifdef _TW_SEMA_HEAVY_DEBUG
-				printf ("TW_SEMA decrementing [%p]\n",this);
-#endif
-			}
-		}
-//		if(deleteOnZero && cnt < 1)
-//			delete this;
-//		else
-		pthread_mutex_unlock( &localMutex );
-//		printf ("TW_SEMA acquire done\n");
-		return ret;
-	}
+//	int acquire(const struct timespec *abstime) {
+//		int ret = 0;
+//		pthread_mutex_lock( &localMutex );
+//		if(cnt < 1) {
+//#ifdef _TW_SEMA_HEAVY_DEBUG
+//			printf ("TW_SEMA timedwait [%p]\n",this);
+//#endif
+//			ret = pthread_cond_timedwait( &gtZeroCond, &localMutex, abstime ); // wait for change in cnt
+//			if(ret == 0) {// if we waited successfully, and no timeout
+//				cnt--;   //   the decrement the count down one
+//#ifdef _TW_SEMA_HEAVY_DEBUG
+//				printf ("TW_SEMA decrementing [%p]\n",this);
+//#endif
+//			}
+//		}
+////		if(deleteOnZero && cnt < 1)
+////			delete this;
+////		else
+//		pthread_mutex_unlock( &localMutex );
+////		printf ("TW_SEMA acquire done\n");
+//		return ret;
+//	}
+//
+//	int acquireAndKeepLock(const struct timespec *abstime) {
+//		int ret = 0;
+//		pthread_mutex_lock( &localMutex );
+//		if(cnt < 1) {
+//#ifdef _TW_SEMA_HEAVY_DEBUG
+//			printf ("TW_SEMA timedwait [%p]\n",this);
+//#endif
+//			ret = pthread_cond_timedwait( &gtZeroCond, &localMutex, abstime ); // wait for change in cnt
+//			if(ret == 0) {// if we waited successfully, and no timeout
+//				cnt--;   //   the decrement the count down one
+//#ifdef _TW_SEMA_HEAVY_DEBUG
+//				printf ("TW_SEMA decrementing [%p]\n",this);
+//#endif
+//			}
+//		}
+//		return ret;
+//	}
 
-	int acquireAndKeepLock(const struct timespec *abstime) {
-		int ret = 0;
-		pthread_mutex_lock( &localMutex );
-		if(cnt < 1) {
-#ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA timedwait [%p]\n",this);
-#endif
-			ret = pthread_cond_timedwait( &gtZeroCond, &localMutex, abstime ); // wait for change in cnt
-			if(ret == 0) {// if we waited successfully, and no timeout
-				cnt--;   //   the decrement the count down one
-#ifdef _TW_SEMA_HEAVY_DEBUG
-				printf ("TW_SEMA decrementing [%p]\n",this);
-#endif
-			}
-		}
-		return ret;
-	}
 
 
 
-	/**
-	 * An easier to use acquire waiting for a given number of microseconds.
-	 * @param usec_wait
-	 * @return
-	 */
-	int acquire(const int64_t usec_wait ) {
-		timeval tv;
-		timespec ts;
-		gettimeofday(&tv, NULL);
-		TWlib::add_usec_to_timeval(usec_wait, &tv);
-		TWlib::timeval_to_timespec(&tv,&ts);
-		return acquire( &ts );
-	}
-
-	int acquireAndKeepLock(const int64_t usec_wait ) {
-		timeval tv;
-		timespec ts;
-		gettimeofday(&tv, NULL);
-		TWlib::add_usec_to_timeval(usec_wait, &tv);
-		TWlib::timeval_to_timespec(&tv,&ts);
-		return acquireAndKeepLock( &ts );
-	}
 
 	/**
 	 * Increments the counter, and alerts anyone waiting.

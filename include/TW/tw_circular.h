@@ -72,9 +72,14 @@ public:
 	tw_safeCircular( HANDLE theHeap );
 #endif
 	void add( T &d );
+	bool add( T &the_d, const int64_t usec_wait  );
+	bool addIfRoom( T &the_d );
 #ifdef TWLIB_HAS_MOVE_SEMANTICS
 	void addMv( T &d );
+	bool addMv( T &the_d, const int64_t usec_wait  );
+	bool addMvIfRoom( T &the_d );
 #endif
+
 
 	void transferFrom( tw_safeCircular<T,ALLOC> &other ); // transfer record from other to 'this' - can block
 	bool transferFromNoBlock( tw_safeCircular<T,ALLOC> &other ); // transfer record from other to 'this' -
@@ -355,7 +360,9 @@ void tw_safeCircular<T,ALLOC>::disable() {
 }
 
 
-// will block is queue is full!!
+/**
+ * Will block if queue is full
+ */
 template <class T,class ALLOC>
 void tw_safeCircular<T,ALLOC>::add( T &the_d ) {
 	TW_CIRCULAR_DBG_OUT("acquireAndKeepLock - add()");
@@ -377,6 +384,79 @@ void tw_safeCircular<T,ALLOC>::addMv( T &the_d ) {
 	TW_CIRCULAR_DBG_OUT("remain post-add(): %d",remain());
 	sema->releaseSemaLock();
 //	unblock(); // let one blocking call know...
+}
+#endif
+
+// will block is queue is full!!
+template <class T,class ALLOC>
+bool tw_safeCircular<T,ALLOC>::addIfRoom( T &the_d ) {
+	bool ret = false;
+	TW_CIRCULAR_DBG_OUT("acquireAndKeepLock - add()");
+	if(sema->acquireAndKeepLockNoBlock()) {
+		nextIn = nextNextIn();
+		data[nextIn] = the_d;
+		TW_CIRCULAR_DBG_OUT("remain post-add(): %d",remain());
+		ret = true;
+	} else {
+		TW_CIRCULAR_DBG_OUT("not adding. no room: %d",remain());
+	}
+	sema->releaseSemaLock();
+	return ret;
+}
+
+#ifdef TWLIB_HAS_MOVE_SEMANTICS
+template <class T,class ALLOC>
+bool tw_safeCircular<T,ALLOC>::addMvIfRoom( T &the_d ) {
+	bool ret = false;
+	TW_CIRCULAR_DBG_OUT("acquireAndKeepLock - add(move)");
+	if(sema->acquireAndKeepLockNoBlock()) {
+		nextIn = nextNextIn();
+		data[nextIn] = std::move(the_d);
+		TW_CIRCULAR_DBG_OUT("remain post-add(): %d",remain());
+		ret = true;
+	} else {
+		TW_CIRCULAR_DBG_OUT("not adding. no room: %d",remain());
+	}
+	sema->releaseSemaLock();
+	return ret;
+}
+#endif
+
+
+// will block is queue is full!!
+template <class T,class ALLOC>
+bool tw_safeCircular<T,ALLOC>::add( T &the_d, const int64_t usec_wait  ) {
+	bool ret = true;
+	TW_CIRCULAR_DBG_OUT("acquireAndKeepLock - add()");
+	int r = sema->acquireAndKeepLock(usec_wait);
+	if(!r) {
+		nextIn = nextNextIn();
+		data[nextIn] = the_d;
+		TW_CIRCULAR_DBG_OUT("remain post-add(): %d",remain());
+	} else {
+		TW_CIRCULAR_DBG_OUT("timeout / error on circular buffer: remain = %d",remain());
+		ret = false;
+	}
+	sema->releaseSemaLock();
+	return ret;
+}
+
+#ifdef TWLIB_HAS_MOVE_SEMANTICS
+template <class T,class ALLOC>
+bool tw_safeCircular<T,ALLOC>::addMv( T &the_d, const int64_t usec_wait  ) {
+	bool ret = true;
+	TW_CIRCULAR_DBG_OUT("acquireAndKeepLock - add(move)");
+	int r = sema->acquireAndKeepLock(usec_wait);
+	if(!r) {
+		nextIn = nextNextIn();
+		data[nextIn] = std::move(the_d);
+		TW_CIRCULAR_DBG_OUT("remain post-add(): %d",remain());
+	} else {
+		TW_CIRCULAR_DBG_OUT("timeout / error on circular buffer: remain = %d",remain());
+		ret = false;
+	}
+	sema->releaseSemaLock();
+	return ret;
 }
 #endif
 
