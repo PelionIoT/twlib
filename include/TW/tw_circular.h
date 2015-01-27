@@ -26,7 +26,7 @@
 #endif
 
 
-#define DEBUG_TW_CIRCULAR_H
+//#define DEBUG_TW_CIRCULAR_H
 
 #ifdef DEBUG_TW_CIRCULAR_H
 #pragma message "!!!!!!!!!!!! tw_circular is Debug Heavy!!"

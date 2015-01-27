@@ -21,7 +21,7 @@
 
 #include <TW/tw_utils.h>
 
-#define _TW_SEMA_HEAVY_DEBUG
+//#define _TW_SEMA_HEAVY_DEBUG
 
 #ifdef _TW_SEMA_HEAVY_DEBUG
 #include <stdio.h>
@@ -65,7 +65,7 @@ public:
 		pthread_mutex_lock( &localMutex );
 		while(cnt < 1) {
 #ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA wait (acquire) [%x]\n",this);
+			printf ("TW_SEMA wait (acquire) [%p]\n",this);
 #endif
 			ret = pthread_cond_wait( &gtZeroCond, &localMutex ); // wait for change in cnt
 		}
@@ -80,7 +80,7 @@ public:
 		pthread_mutex_lock( &localMutex );
 		while(1) {
 #ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA acquire wait (cnt=%d) [%x]\n",cnt, this);
+			printf ("TW_SEMA acquire wait (cnt=%d) [%p]\n",cnt, this);
 #endif
 			if(cnt >= 1) break;
 			ret = pthread_cond_wait( &gtZeroCond, &localMutex ); // wait for change in cnt
@@ -118,11 +118,13 @@ public:
 		while(1) {
 			if(cnt < size) break;
 #ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA waitForAcquirers decrement (cnt=%d) [%x]\n",cnt, this);
+			printf ("TW_SEMA waitForAcquirers decrement (cnt=%d) [%p]\n",cnt, this);
 			if(cnt > size) printf("EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEK!!!\n");
 #endif
 			ret = pthread_cond_wait( &decrementCond, &localMutex );
+#ifdef _TW_SEMA_HEAVY_DEBUG
 			printf ("TW_SEMA got decrement (cnt=%d)\n",cnt);
+#endif
 		}
 		return ret;
 	}
@@ -180,13 +182,13 @@ public:
 		pthread_mutex_lock( &localMutex );
 		if(cnt < 1) {
 #ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA timedwait [%x]\n",this);
+			printf ("TW_SEMA timedwait [%p]\n",this);
 #endif
 			ret = pthread_cond_timedwait( &gtZeroCond, &localMutex, abstime ); // wait for change in cnt
 			if(ret == 0) {// if we waited successfully, and no timeout
 				cnt--;   //   the decrement the count down one
 #ifdef _TW_SEMA_HEAVY_DEBUG
-				printf ("TW_SEMA decrementing [%x]\n",this);
+				printf ("TW_SEMA decrementing [%p]\n",this);
 #endif
 			}
 		}
@@ -203,13 +205,13 @@ public:
 		pthread_mutex_lock( &localMutex );
 		if(cnt < 1) {
 #ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA timedwait [%x]\n",this);
+			printf ("TW_SEMA timedwait [%p]\n",this);
 #endif
 			ret = pthread_cond_timedwait( &gtZeroCond, &localMutex, abstime ); // wait for change in cnt
 			if(ret == 0) {// if we waited successfully, and no timeout
 				cnt--;   //   the decrement the count down one
 #ifdef _TW_SEMA_HEAVY_DEBUG
-				printf ("TW_SEMA decrementing [%x]\n",this);
+				printf ("TW_SEMA decrementing [%p]\n",this);
 #endif
 			}
 		}
@@ -249,13 +251,13 @@ public:
 		int ret = 0;
 		pthread_mutex_lock( &localMutex );
 #ifdef _TW_SEMA_HEAVY_DEBUG
-		printf ("TW_SEMA (release) incrementing [%x]\n",this);
+		printf ("TW_SEMA (release) incrementing [%p]\n",this);
 #endif
 		cnt++;
 		if(cnt > 0) { // the 'if' should not be necessary
 			ret = pthread_cond_signal( &gtZeroCond );
 #ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA signaled [%x]\n",this);
+			printf ("TW_SEMA signaled [%p]\n",this);
 #endif
 		}
 		pthread_mutex_unlock( &localMutex );
@@ -267,12 +269,12 @@ public:
 		int ret = 0;
 		cnt++;
 #ifdef _TW_SEMA_HEAVY_DEBUG
-		printf ("TW_SEMA (release) incrementing (%d) [%x]\n",cnt, this);
+		printf ("TW_SEMA (release) incrementing (%d) [%p]\n",cnt, this);
 #endif
 		if(cnt > 0) { // the 'if' should not be necessary
 			ret = pthread_cond_signal( &gtZeroCond );
 #ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA signaled [%x]\n",this);
+			printf ("TW_SEMA signaled [%p]\n",this);
 #endif
 		}
 		return ret;
@@ -285,13 +287,13 @@ public:
 		int ret = 0;
 		pthread_mutex_lock( &localMutex );
 #ifdef _TW_SEMA_HEAVY_DEBUG
-		printf ("TW_SEMA (release) incrementing [%x]\n",this);
+		printf ("TW_SEMA (release) incrementing [%p]\n",this);
 #endif
 		cnt++;
 		if(cnt > 0) // the 'if' should not be necessary
 			ret = pthread_cond_signal( &gtZeroCond );
 #ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA signaled [%x]\n",this);
+			printf ("TW_SEMA signaled [%p]\n",this);
 #endif
 		return ret;
 	}
@@ -306,14 +308,14 @@ public:
 		int ret = 0;
 		pthread_mutex_lock( &localMutex );
 #ifdef _TW_SEMA_HEAVY_DEBUG
-		printf ("TW_SEMA incrementing [%x]\n",this);
+		printf ("TW_SEMA incrementing [%p]\n",this);
 #endif
 		cnt++;
 //		if(cnt > 0) // the 'if' should not be necessary
 		pthread_cond_broadcast( &decrementCond );
 		ret = pthread_cond_broadcast( &gtZeroCond );
 #ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA signaled [%x]\n",this);
+			printf ("TW_SEMA signaled [%p]\n",this);
 #endif
 		pthread_mutex_unlock( &localMutex );
 		return ret;
@@ -354,7 +356,7 @@ public:
 
 	~TW_SemaTwoWay() {
 #ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA DESTRUCTOR [%x]\n",this);
+			printf ("TW_SEMA DESTRUCTOR [%p]\n",this);
 #endif
 //		if(!deleteOnZero) // if deleteOnZero is set, then this mutex is locked already
 		pthread_mutex_lock( &localMutex );  // yes, order is important here...
