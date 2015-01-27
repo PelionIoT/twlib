@@ -111,6 +111,28 @@ public:
 		return ret;
 	}
 
+	int waitForAcquirers(const struct timespec *abstime, bool lock = true) {
+		int ret = 0;
+		if(lock)
+			pthread_mutex_lock( &localMutex );
+		while(1) {
+			if(cnt >= size)
+				ret = pthread_cond_timedwait( &decrementCond, &localMutex, abstime );
+		}
+		pthread_mutex_unlock( &localMutex );
+		return ret;
+	}
+
+	int waitForAcquirers(const int64_t usec_wait, bool lock = true ) {
+		timeval tv;
+		timespec ts;
+		gettimeofday(&tv, NULL);
+		TWlib::add_usec_to_timeval(usec_wait, &tv);
+		TWlib::timeval_to_timespec(&tv,&ts);
+		return waitForAcquirers( &ts, lock );
+	}
+
+
 	int waitForAcquirersKeepLock(bool lock = true) {
 		int ret = 0;
 		if(lock)
@@ -127,6 +149,36 @@ public:
 #endif
 		}
 		return ret;
+	}
+
+
+	int waitForAcquirersKeepLock(const struct timespec *abstime, bool lock = true) {
+		int ret = 0;
+		if(lock)
+			pthread_mutex_lock( &localMutex );
+		while(1) {
+			if(cnt < size) break;
+#ifdef _TW_SEMA_HEAVY_DEBUG
+			printf ("TW_SEMA waitForAcquirers decrement (cnt=%d) [%p]\n",cnt, this);
+			if(cnt > size) printf("EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEK!!!\n");
+#endif
+			ret = pthread_cond_timedwait( &decrementCond, &localMutex, abstime );
+#ifdef _TW_SEMA_HEAVY_DEBUG
+			if(!ret) printf ("TW_SEMA got decrement (cnt=%d)\n",cnt);
+			else printf("TW_SEMA got error or timeout (cnt=%d)\n",cnt);
+#endif
+		}
+		return ret;
+	}
+
+
+	int waitForAcquirersKeepLock(const int64_t usec_wait, bool lock = true ) {
+		timeval tv;
+		timespec ts;
+		gettimeofday(&tv, NULL);
+		TWlib::add_usec_to_timeval(usec_wait, &tv);
+		TWlib::timeval_to_timespec(&tv,&ts);
+		return waitForAcquirersKeepLock( &ts, lock );
 	}
 
 	int waitForDecrementKeepLock(const struct timespec *abstime, bool lock = true) {

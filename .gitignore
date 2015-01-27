@@ -23,3 +23,4 @@ test_rbtree
 /test_twcircular
 /test_twcircular_mv
 /test_twcircular_mv_noblock
+/test_twcircular_mv_timeout
