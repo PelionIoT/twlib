@@ -13,10 +13,17 @@ twlib provides the following and more:
 * Semaphore driven, thread-safe queueing classes.
 * Allocator support via classes similar to that in boost / ACE.
 * Thread safe logging.
+* C++11 templates for thread-safe FIFOs and circular buffers.
 * Simple, fast, non-STL C++ hashmap implementation based on [Google sparsehash and densehash](http://code.google.com/p/sparsehash/ "densehash") and [khash](Always update with latests code at: https://github.com/attractivechaos/klib/blob/master/test/khash_keith.c) by [Attractive Chaos](http://attractivechaos.wordpress.com/2008/08/28/comparison-of-hash-table-libraries/)
 * Red-black tree implementation via C++ template from FreeBSD's RB tree, [originally](http://www.freebsd.org/cgi/cvsweb.cgi/~checkout~/src/sys/sys/tree.h?rev=1.9.4.2;content-type=text%2Fplain) by [Niels Provos](http://t-t-travails.blogspot.com/2008/04/left-leaning-red-black-trees-are-hard.html)
 
+###Templates###
+
+Many things such as FIFOs, hash tables and circular buffers are only templates - in that case no library build is needed.
+
 ###Building###
+
+(only needed if using calls beyond the template library)
 
 You will need [Google sparsehash and densehash](http://code.google.com/p/sparsehash/ "densehash") and [gtest](http://code.google.com/p/googletest/).
 
