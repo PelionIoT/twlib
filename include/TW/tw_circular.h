@@ -80,13 +80,17 @@ public:
 	bool addMvIfRoom( T &the_d );
 #endif
 
+	// array like functions
+	bool get(int n, T &d );
+	bool set(int n, T &d );
+	bool setMv(int n, T &d );
 
+	// unimplemented-->
 	void transferFrom( tw_safeCircular<T,ALLOC> &other ); // transfer record from other to 'this' - can block
 	bool transferFromNoBlock( tw_safeCircular<T,ALLOC> &other ); // transfer record from other to 'this' -
 	                                               // wont block - false if would have blocked
-//	bool peek( T &fill ); // true if got valid value - look at next, dont remove
-//	bool peekOrBlock( T &fill ); // true if got data - look at next, dont remove
-//	bool peekOrBlock( T &fill, TimeVal &t );
+	// <--unimplemented
+
 	bool remove( T &fill ); // true if got data
 #ifdef TWLIB_HAS_MOVE_SEMANTICS
 	bool remove_mv( T &fill );
@@ -101,6 +105,24 @@ public:
 	void unblockAll(); // unblock all blocking calls
 	void disable();
 	void enable();
+
+	class iter final {
+		friend class tw_safeCircular<T,ALLOC>;
+	public:
+		bool atEnd();
+		bool data(T &);
+		bool next();
+		void release();
+	protected:
+		iter(tw_safeCircular &container);
+		tw_safeCircular &owner;
+		bool valid;
+		int n; // count
+		int p; // pointer into array
+	};
+
+	tw_safeCircular<T,ALLOC>::iter getIter();
+
 //	void startIter( iter &i );
 ////	tw_safeCircular &operator=( const tw_safeCircular &o );
 //
@@ -459,6 +481,133 @@ bool tw_safeCircular<T,ALLOC>::addMv( T &the_d, const int64_t usec_wait  ) {
 	return ret;
 }
 #endif
+
+template <class T,class ALLOC>
+bool tw_safeCircular<T,ALLOC>::get(int n, T &d ) {
+	bool ret = false;
+	sema->lockSemaOnly();
+	if((n >= 0) && (n < remain())) {
+		int c = 0;
+		int p = nextOut;
+		p++;
+		while(c != n) {
+			if(p >= _size) p = 0;
+			p++; c++;
+		}
+		d = data[p];
+		ret = true;
+	}
+	sema->releaseSemaLock();
+	return ret;
+}
+
+template <class T,class ALLOC>
+bool tw_safeCircular<T,ALLOC>::set(int n, T &d ) {
+	bool ret = false;
+	sema->lockSemaOnly();
+	if((n >= 0) && (n < remain())) {
+		int c = 0;
+		int p = nextOut;
+		p++;
+		while(c != n) {
+			if(p >= _size) p = 0;
+			p++; c++;
+		}
+		data[p] = d;
+		ret = true;
+	}
+	sema->releaseSemaLock();
+	return ret;
+}
+
+#ifdef TWLIB_HAS_MOVE_SEMANTICS
+template <class T,class ALLOC>
+bool tw_safeCircular<T,ALLOC>::setMv(int n, T &d ) {
+	bool ret = false;
+	sema->lockSemaOnly();
+	if((n >= 0) && (n < remain())) {
+		int c = 0;
+		int p = nextOut;
+		p++;
+		while(c != n) {
+			if(p >= _size) p = 0;
+			p++; c++;
+		}
+		data[p] = std::move(d);
+		ret = true;
+	}
+	sema->releaseSemaLock();
+	return ret;
+}
+#endif
+
+/*
+class iter {
+	bool atEnd();
+	bool data(T &);
+	bool next();
+	void release();
+protected:
+	iter(tw_safeCircular &container);
+	tw_safeCircular &owner
+	bool valid;
+	int n; // count
+	int p; // pointer into array
+};
+*/
+
+template <class T,class ALLOC>
+typename tw_safeCircular<T,ALLOC>::iter tw_safeCircular<T,ALLOC>::getIter() {
+	return tw_safeCircular<T,ALLOC>::iter(*this);
+}
+
+template <class T,class ALLOC>
+tw_safeCircular<T,ALLOC>::iter::iter(tw_safeCircular<T,ALLOC> &c) :
+	owner(c), valid(false), n(0), p(0)
+{
+	c.sema->lockSemaOnly();
+	p = c.nextOut;
+	p++;
+	if(p >= c._size) p = 0;
+	if(c.remain() > 0)
+		valid = true;
+}
+
+template <class T,class ALLOC>
+bool tw_safeCircular<T,ALLOC>::iter::next() {
+	n++;
+	if(n < owner.remain()) {
+		p++;
+		if(p >= owner._size) p = 0;
+		return true;
+	} else {
+		valid = false;
+		return false;
+	}
+}
+
+template <class T,class ALLOC>
+bool tw_safeCircular<T,ALLOC>::iter::data(T &d) {
+	if(valid && n < owner.remain()) {
+		d = owner.data[p];
+		return true;
+	} else
+		return false;
+}
+
+template <class T,class ALLOC>
+bool tw_safeCircular<T,ALLOC>::iter::atEnd() {
+	if(valid && n < owner.remain()) {
+		return false;
+	} else
+		return true;
+}
+
+template <class T,class ALLOC>
+void tw_safeCircular<T,ALLOC>::iter::release() {
+	owner.sema->releaseSemaLock();
+	valid = false;
+}
 
 
 template <class T,class ALLOC>
