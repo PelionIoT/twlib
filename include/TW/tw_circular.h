@@ -85,6 +85,7 @@ public:
 	bool set(int n, T &d );
 	bool setMv(int n, T &d );
 
+
 	// unimplemented-->
 	void transferFrom( tw_safeCircular<T,ALLOC> &other ); // transfer record from other to 'this' - can block
 	bool transferFromNoBlock( tw_safeCircular<T,ALLOC> &other ); // transfer record from other to 'this' -
@@ -131,6 +132,7 @@ public:
 	~tw_safeCircular();
 protected:
 	bool isObjects;
+	bool _reverse;
 	bool full;
 	TW_SemaTwoWay *sema;
 	bool enabled; // if enabled the FIFO can take new values
@@ -138,23 +140,41 @@ protected:
 	pthread_cond_t newdataCond;
 	int _block_cnt;
 	int nextNextIn() {
+		int n;
 		if(full) nextOut = nextNextOut();
-		int n = nextIn + 1;
-		if(n >= _size) n = 0;
-		if(n == nextOut) full = true;
+		if(_reverse) {
+			n = nextIn - 1;
+			if(n < 0) n = _size - 1;
+			if(n == nextOut) full = true;
+		} else {
+			n = nextIn + 1;
+			if(n >= _size) n = 0;
+			if(n == nextOut) full = true;
+		}
 		return n;
 	}
 	int nextNextOut() {
+		int n;
 		full = false;
-		int n = nextOut + 1;
-		if(n >= _size) n = 0;
+		if(_reverse) {
+			n = nextOut - 1;
+			if(n < 0) n = _size - 1;
+		} else {
+			n = nextOut + 1;
+			if(n >= _size) n = 0;
+		}
 		return n;
 	}
 	int remain() {  // nextIn is always ahead of nextOut. circular
 		if(full) return _size;
 		if(nextIn < 0) return 0;
-		if(nextOut <= nextIn) return nextIn-nextOut;
-		else return _size - (nextOut - nextIn);
+		if(_reverse) {
+			if(nextOut >= nextIn) return nextOut-nextIn;
+			else return _size - (nextIn - nextOut);
+		} else {
+			if(nextOut <= nextIn) return nextIn-nextOut;
+			else return _size - (nextOut - nextIn);
+		}
 	}
 	int nextIn;   // position to place next in value
 	int nextOut;  // position to pull next out value
@@ -164,6 +184,28 @@ protected:
 #ifdef _TW_WINDOWS
 	HANDLE hHeap;
 #endif
+
+public:
+	// flips the circular around, so that the first element is now the last
+	void reverse() {
+//		if(!full) {
+			if(!_reverse) {
+				int t = nextOut;
+				nextOut = nextIn + 1;
+				if(nextOut >= _size) nextOut = nextOut - _size;
+				nextIn = t + 1;
+				if(nextIn >= _size) nextIn = nextIn - _size;
+			} else {
+				int t = nextOut;
+				nextOut = nextIn - 1;
+				if(nextOut < 0) nextOut = _size - 1;
+				nextIn = t - 1;
+				if(nextIn < 0) nextIn = _size - 1;
+			}
+//		}
+		_reverse = !(_reverse);
+	}
+
 };
 
 
@@ -253,7 +295,7 @@ tw_safeCircular<T,ALLOC>::tw_safeCircular( HANDLE theHeap ) : enabled( true ) {
 #endif
 
 template <class T,class ALLOC>
-tw_safeCircular<T,ALLOC>::tw_safeCircular( int size, bool initobj ) : isObjects(initobj), full( false ), enabled( true ),
+tw_safeCircular<T,ALLOC>::tw_safeCircular( int size, bool initobj ) : isObjects(initobj), _reverse(false), full( false ), enabled( true ),
 	_block_cnt(0), nextIn(-1), nextOut(-1), _size(size), data(NULL) {
 //	alloc = NULL;
 	pthread_mutex_init( &newDataMutex, NULL );
@@ -489,6 +531,10 @@ bool tw_safeCircular<T,ALLOC>::get(int n, T &d ) {
 	if((n >= 0) && (n < remain())) {
 		int c = 0;
 		int p = nextOut;
+		if(_reverse) {
+			p = nextIn -1;
+			if(p < 0) p = _size -1;
+		}
 		p++;
 		while(c != n) {
 			if(p >= _size) p = 0;
@@ -508,6 +554,10 @@ bool tw_safeCircular<T,ALLOC>::set(int n, T &d ) {
 	if((n >= 0) && (n < remain())) {
 		int c = 0;
 		int p = nextOut;
+		if(_reverse) {
+			p = nextIn -1;
+			if(p < 0) p = _size -1;
+		}
 		p++;
 		while(c != n) {
 			if(p >= _size) p = 0;
@@ -528,6 +578,10 @@ bool tw_safeCircular<T,ALLOC>::setMv(int n, T &d ) {
 	if((n >= 0) && (n < remain())) {
 		int c = 0;
 		int p = nextOut;
+		if(_reverse) {
+			p = nextIn -1;
+			if(p < 0) p = _size -1;
+		}
 		p++;
 		while(c != n) {
 			if(p >= _size) p = 0;

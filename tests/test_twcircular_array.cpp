@@ -89,7 +89,44 @@ int main()
     	 data d;
     	 d.x = n;
          theQ.add(d);
+    	 printf("add [%d] .remaining() = %d\n", n, theQ.remaining());
      }
+
+     int n = 0;
+     data d;
+     while(theQ.remove(d)) {
+    	 printf("remove [%d]  = %d\n", n, d.x);
+    	 n++;
+     }
+
+     printf("--- reverse ---\n");
+
+     for(int n=0;n<QUEUE_SIZE;n++) {
+    	 data d;
+    	 d.x = n;
+         theQ.add(d);
+    	 printf("add [%d] .remaining() = %d\n", n, theQ.remaining());
+     }
+
+     theQ.reverse();
+
+     n = 0;
+     while(theQ.remove(d)) {
+    	 printf("remove [%d]  = %d\n", n, d.x);
+    	 n++;
+     }
+
+     theQ.reverse();
+     printf("--- get()/set() ---\n");
+
+
+     for(int n=0;n<QUEUE_SIZE;n++) {
+    	 data d;
+    	 d.x = n;
+         theQ.add(d);
+     }
+
+
 
      for(int n=0;n<QUEUE_SIZE;n++) {
     	 data d;
@@ -99,10 +136,25 @@ int main()
     	 assert(theQ.set(n,d));
      }
 
+     theQ.reverse();
+     printf("get() after reverse() [should be the same]\n");
+
+     for(int n=0;n<QUEUE_SIZE;n++) {
+    	 data d;
+    	 assert(theQ.get(n,d));
+    	 printf("get(%d) = %d\n", n, d.x);
+     }
+
+     data removedD;
+     assert(theQ.remove(removedD));
+     printf("removed x=%d\n", removedD.x);
+     assert(removedD.x == 190);
+
+     theQ.reverse();
 
      tw_safeCircular<data, TESTAlloc >::iter iter = theQ.getIter();
 
-     int n = 0;
+     n = 0;
      while(!iter.atEnd()) {
     	 data d;
     	 iter.data(d);
@@ -114,9 +166,8 @@ int main()
      }
      iter.release();
 
-     data removedD;
      theQ.remove(removedD);
-     printf("removed: %d\n\n", removedD.x);
+     printf("removed: x=%d\n\n", removedD.x);
 
      tw_safeCircular<data, TESTAlloc >::iter iter2 = theQ.getIter();
 
