@@ -94,13 +94,13 @@ public:
 
 	bool remove( T &fill ); // true if got data
 #ifdef TWLIB_HAS_MOVE_SEMANTICS
-	bool remove_mv( T &fill );
+	bool removeMv( T &fill );
 #endif
 	bool removeOrBlock( T &fill ); // true if removed something
 //	bool removeOrBlock( T &fill, TimeVal &t );
 	bool removeOrBlock( T &fill, const int64_t usec_wait );
-	bool remove_mvOrBlock( T &fill );
-	bool remove_mvOrBlock( T &fill, const int64_t usec_wait );
+	bool removeMvOrBlock( T &fill );
+	bool removeMvOrBlock( T &fill, const int64_t usec_wait );
 	void clearAll(); // remove all nodes (does not delete T)
 //	void unblock();  // unblock 1 blocking call
 	void unblockAll(); // unblock all blocking calls
@@ -681,7 +681,7 @@ bool tw_safeCircular<T,ALLOC>::remove( T &fill ) {
 
 #ifdef TWLIB_HAS_MOVE_SEMANTICS
 template <class T,class ALLOC>
-bool tw_safeCircular<T,ALLOC>::remove_mv( T &fill ) {
+bool tw_safeCircular<T,ALLOC>::removeMv( T &fill ) {
 	bool ret = true;
 	sema->lockSemaOnly();
 	if(remain() > 0) {
@@ -755,7 +755,7 @@ bool tw_safeCircular<T,ALLOC>::removeOrBlock( T &fill, const int64_t usec_wait )
 
 #ifdef TWLIB_HAS_MOVE_SEMANTICS
 template <class T,class ALLOC>
-bool tw_safeCircular<T,ALLOC>::remove_mvOrBlock( T &fill ) {
+bool tw_safeCircular<T,ALLOC>::removeMvOrBlock( T &fill ) {
 	bool ret = true;
 	sema->lockSemaOnly();
 	TW_CIRCULAR_DBG_OUT("removeOrBlock.. remain = %d", remain());
@@ -784,7 +784,7 @@ bool tw_safeCircular<T,ALLOC>::remove_mvOrBlock( T &fill ) {
 }
 
 template <class T,class ALLOC>
-bool tw_safeCircular<T,ALLOC>::remove_mvOrBlock( T &fill, const int64_t usec_wait ) {
+bool tw_safeCircular<T,ALLOC>::removeMvOrBlock( T &fill, const int64_t usec_wait ) {
 	bool ret = true;
 	sema->lockSemaOnly();
 	TW_CIRCULAR_DBG_OUT("removeOrBlock.. remain = %d", remain());

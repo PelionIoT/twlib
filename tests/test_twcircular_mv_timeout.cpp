@@ -112,7 +112,7 @@ void *consumer( void *ptr ) {
 	data D;
 	while(x > 0) {
 		while(1) {
-			if(Q->remove_mvOrBlock(D, 10)) {
+			if(Q->removeMvOrBlock(D, 10)) {
 				cnt++;
 				printf("<<< Consumer %d: removed %d\n\n",inf->threadnum, D.x);
 				TOTAL--;
