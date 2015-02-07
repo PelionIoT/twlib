@@ -119,7 +119,7 @@ void *consumer( void *ptr ) {
 //			totalMutex->release();
 //			break;
 //		}
-		if(Q->remove_mvOrBlock(D)) {
+		if(Q->removeMvOrBlock(D)) {
 			cnt++;
 			printf("<<< Consumer %d: removed %d\n\n",inf->threadnum, D.x);
 			TOTAL--;

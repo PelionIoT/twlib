@@ -99,6 +99,22 @@ int main()
     	 n++;
      }
 
+     printf("--- again...\n");
+
+
+     for(int n=0;n<QUEUE_SIZE;n++) {
+    	 data d;
+    	 d.x = n;
+         theQ.add(d);
+    	 printf("add [%d] .remaining() = %d\n", n, theQ.remaining());
+     }
+
+     n = 0;
+     while(theQ.remove(d)) {
+    	 printf("remove [%d]  = %d\n", n, d.x);
+    	 n++;
+     }
+
      printf("--- reverse ---\n");
 
      for(int n=0;n<QUEUE_SIZE;n++) {
@@ -108,7 +124,7 @@ int main()
     	 printf("add [%d] .remaining() = %d\n", n, theQ.remaining());
      }
 
-     theQ.reverse();
+     theQ.reverse();                                                  // reverse. now backwards
 
      n = 0;
      while(theQ.remove(d)) {
@@ -116,28 +132,46 @@ int main()
     	 n++;
      }
 
-     theQ.reverse();
+     theQ.reverse();                                                   // reverse. now forward
+     printf("--- reverse (again) ---\n");
+
+//     printf("-- clear() --- \n");
+//     for(int n=0;n<QUEUE_SIZE;n++) {
+//    	 data d;
+//    	 d.x = n;
+//         theQ.add(d);
+//     }
+//     theQ.clear();
+     printf("--- sanity check ---\n");
+     assert(theQ.remaining() == 0);
+     d.x=101;
+     theQ.add(d);
+     assert(theQ.remaining() == 1);
+     d.x=0;
+     assert(theQ.remove(d));
+     assert(d.x == 101);
+     assert(theQ.remaining() == 0);
+
      printf("--- get()/set() ---\n");
 
 
      for(int n=0;n<QUEUE_SIZE;n++) {
     	 data d;
     	 d.x = n;
-         theQ.add(d);
+    	 theQ.add(d);
      }
-
-
 
      for(int n=0;n<QUEUE_SIZE;n++) {
     	 data d;
     	 assert(theQ.get(n,d));
+    	 assert(d.x == n);
     	 printf("get(%d) = %d\n", n, d.x);
     	 d.x = d.x * 10;
     	 assert(theQ.set(n,d));
      }
 
-     theQ.reverse();
-     printf("get() after reverse() [should be the same]\n");
+     theQ.reverse();                                                   // reverse. now backwards
+     printf("get() after reverse() [should be the same but * 10]\n");
 
      for(int n=0;n<QUEUE_SIZE;n++) {
     	 data d;
@@ -145,12 +179,24 @@ int main()
     	 printf("get(%d) = %d\n", n, d.x);
      }
 
+     theQ.reverse();                                                   // reverse. now forwards
+     printf("sanity check....\n");
+
+     for(int n=0;n<QUEUE_SIZE;n++) {
+    	 data d;
+    	 assert(theQ.get(n,d));
+    	 printf("get(%d) = %d\n", n, d.x);
+     }
+     theQ.reverse();                                                   // reverse. now backwards
+
      data removedD;
-     assert(theQ.remove(removedD));
+     assert(theQ.remove(removedD));  // the last item should be 190 - so now its the first...
      printf("removed x=%d\n", removedD.x);
      assert(removedD.x == 190);
 
-     theQ.reverse();
+     theQ.reverse();                                                  // reverse. now forwards
+     printf("reverse()...\n");
+
 
      tw_safeCircular<data, TESTAlloc >::iter iter = theQ.getIter();
 
@@ -183,6 +229,25 @@ int main()
      }
      iter2.release();
 
+     theQ.clear();
+     printf("clear()\n");
+     assert(theQ.remaining() == 0);
+
+     for(int n=0;n<QUEUE_SIZE;n++) {
+    	 data d;
+    	 d.x = n;
+    	 theQ.add(d);
+     }
+     assert(theQ.remaining() == QUEUE_SIZE);
+
+     for(int n=0;n<QUEUE_SIZE;n++) {
+    	 data d;
+    	 assert(theQ.get(n,d));
+    	 assert(d.x == n);
+//    	 printf("get(%d) = %d\n", n, d.x);
+    	 d.x = d.x * 10;
+    	 assert(theQ.set(n,d));
+     }
 
      exit(0);
 }

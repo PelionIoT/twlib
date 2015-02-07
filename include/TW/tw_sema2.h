@@ -54,6 +54,15 @@ public:
 	}
 
 
+	void reset() {
+		pthread_mutex_lock( &localMutex );
+		cnt = size;
+		pthread_mutex_unlock( &localMutex );
+	}
+
+	void resetNoLock() {
+		cnt = size;
+	}
 
 	/**
 	 * Acuire the semaphore, waiting indefinitely. Waits until the semaphore is positive, then decrements the semaphore by
@@ -458,6 +467,10 @@ public:
 		ret = cnt;
 		pthread_mutex_unlock( &localMutex );
 		return ret;
+	}
+
+	int countNoBlock() {
+		return cnt;
 	}
 
 	/**

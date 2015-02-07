@@ -101,7 +101,7 @@ public:
 	bool removeOrBlock( T &fill, const int64_t usec_wait );
 	bool removeMvOrBlock( T &fill );
 	bool removeMvOrBlock( T &fill, const int64_t usec_wait );
-	void clearAll(); // remove all nodes (does not delete T)
+	void clear(); // remove all nodes (does not delete T)
 //	void unblock();  // unblock 1 blocking call
 	void unblockAll(); // unblock all blocking calls
 	void disable();
@@ -133,29 +133,31 @@ public:
 protected:
 	bool isObjects;
 	bool _reverse;
-	bool full;
 	TW_SemaTwoWay *sema;
 	bool enabled; // if enabled the FIFO can take new values
-	pthread_mutex_t newDataMutex; // thread safety for FIFO
-	pthread_cond_t newdataCond;
+//	pthread_mutex_t newDataMutex; // thread safety for FIFO
+//	pthread_cond_t newdataCond;
 	int _block_cnt;
+	// should only be called with a sema lock...
+	bool full() {
+		return (!sema->countNoBlock());
+	}
+	// should only be called with a sema lock...
 	int nextNextIn() {
 		int n;
-		if(full) nextOut = nextNextOut();
+//		if(full()) nextOut = nextNextOut();
 		if(_reverse) {
 			n = nextIn - 1;
 			if(n < 0) n = _size - 1;
-			if(n == nextOut) full = true;
 		} else {
 			n = nextIn + 1;
 			if(n >= _size) n = 0;
-			if(n == nextOut) full = true;
 		}
 		return n;
 	}
+	// should only be called with a sema lock...
 	int nextNextOut() {
 		int n;
-		full = false;
 		if(_reverse) {
 			n = nextOut - 1;
 			if(n < 0) n = _size - 1;
@@ -165,16 +167,19 @@ protected:
 		}
 		return n;
 	}
+	// should only be called with a sema lock...
 	int remain() {  // nextIn is always ahead of nextOut. circular
-		if(full) return _size;
-		if(nextIn < 0) return 0;
-		if(_reverse) {
-			if(nextOut >= nextIn) return nextOut-nextIn;
-			else return _size - (nextIn - nextOut);
-		} else {
-			if(nextOut <= nextIn) return nextIn-nextOut;
-			else return _size - (nextOut - nextIn);
-		}
+//		if(!sema->countNoBlock()) full = true; else full = false;
+		return _size - sema->countNoBlock();
+//		if(full) return _size;
+//		if(nextIn < 0) return 0;
+//		if(_reverse) {
+//			if(nextOut >= nextIn) return nextOut-nextIn;
+//			else return _size - (nextIn - nextOut);
+//		} else {
+//			if(nextOut <= nextIn) return nextIn-nextOut;
+//			else return _size - (nextOut - nextIn);
+//		}
 	}
 	int nextIn;   // position to place next in value
 	int nextOut;  // position to pull next out value
@@ -189,21 +194,28 @@ public:
 	// flips the circular around, so that the first element is now the last
 	void reverse() {
 //		if(!full) {
-			if(!_reverse) {
-				int t = nextOut;
-				nextOut = nextIn + 1;
-				if(nextOut >= _size) nextOut = nextOut - _size;
-				nextIn = t + 1;
-				if(nextIn >= _size) nextIn = nextIn - _size;
-			} else {
-				int t = nextOut;
-				nextOut = nextIn - 1;
-				if(nextOut < 0) nextOut = _size - 1;
-				nextIn = t - 1;
-				if(nextIn < 0) nextIn = _size - 1;
-			}
-//		}
+		if(remain() < 1)
+			return;
+
 		_reverse = !(_reverse);
+		int t = nextOut;
+		nextOut = nextIn;
+		nextIn = t;
+//		nextIn = nextNextIn();
+//		if(!_reverse) {
+//				int t = nextOut;
+//				nextOut = nextIn; // + 1;
+////				if(nextOut >= _size) nextOut = nextOut - _size;
+//				nextIn = t + 1;
+//				if(nextIn >= _size) nextIn = nextIn - _size;
+//			} else {
+//				int t = nextOut;
+//				nextOut = nextIn; // - 1;
+////				if(nextOut < 0) nextOut = _size - 1;
+//				nextIn = t - 1;
+//				if(nextIn < 0) nextIn = _size - 1;
+//			}
+////		}
 	}
 
 };
@@ -295,11 +307,11 @@ tw_safeCircular<T,ALLOC>::tw_safeCircular( HANDLE theHeap ) : enabled( true ) {
 #endif
 
 template <class T,class ALLOC>
-tw_safeCircular<T,ALLOC>::tw_safeCircular( int size, bool initobj ) : isObjects(initobj), _reverse(false), full( false ), enabled( true ),
-	_block_cnt(0), nextIn(-1), nextOut(-1), _size(size), data(NULL) {
+tw_safeCircular<T,ALLOC>::tw_safeCircular( int size, bool initobj ) : isObjects(initobj), _reverse(false), enabled( true ),
+	nextIn(-1), nextOut(0), _size(size), data(NULL) {
 //	alloc = NULL;
-	pthread_mutex_init( &newDataMutex, NULL );
-	pthread_cond_init( &newdataCond, NULL );
+//	pthread_mutex_init( &newDataMutex, NULL );
+//	pthread_cond_init( &newdataCond, NULL );
 	data = (T *) ALLOC::malloc( size * sizeof(T) );
 	sema = new TW_SemaTwoWay(size);
 	if(isObjects) {
@@ -451,7 +463,6 @@ void tw_safeCircular<T,ALLOC>::addMv( T &the_d ) {
 }
 #endif
 
-// will block is queue is full!!
 template <class T,class ALLOC>
 bool tw_safeCircular<T,ALLOC>::addIfRoom( T &the_d ) {
 	bool ret = false;
@@ -530,9 +541,9 @@ bool tw_safeCircular<T,ALLOC>::get(int n, T &d ) {
 	sema->lockSemaOnly();
 	if((n >= 0) && (n < remain())) {
 		int c = 0;
-		int p = nextOut;
+		int p = nextOut - 1;
 		if(_reverse) {
-			p = nextIn -1;
+			p = nextIn - 2;
 			if(p < 0) p = _size -1;
 		}
 		p++;
@@ -553,9 +564,9 @@ bool tw_safeCircular<T,ALLOC>::set(int n, T &d ) {
 	sema->lockSemaOnly();
 	if((n >= 0) && (n < remain())) {
 		int c = 0;
-		int p = nextOut;
+		int p = nextOut - 1;
 		if(_reverse) {
-			p = nextIn -1;
+			p = nextIn - 2;
 			if(p < 0) p = _size -1;
 		}
 		p++;
@@ -577,9 +588,9 @@ bool tw_safeCircular<T,ALLOC>::setMv(int n, T &d ) {
 	sema->lockSemaOnly();
 	if((n >= 0) && (n < remain())) {
 		int c = 0;
-		int p = nextOut;
+		int p = nextOut - 1;
 		if(_reverse) {
-			p = nextIn -1;
+			p = nextIn -2;
 			if(p < 0) p = _size -1;
 		}
 		p++;
@@ -621,8 +632,8 @@ tw_safeCircular<T,ALLOC>::iter::iter(tw_safeCircular<T,ALLOC> &c) :
 {
 	c.sema->lockSemaOnly();
 	p = c.nextOut;
-	p++;
-	if(p >= c._size) p = 0;
+//	p++;
+//	if(p >= c._size) p = 0;
 	if(c.remain() > 0)
 		valid = true;
 }
@@ -668,26 +679,49 @@ template <class T,class ALLOC>
 bool tw_safeCircular<T,ALLOC>::remove( T &fill ) {
 	bool ret = true;
 	sema->lockSemaOnly();
-	if(remain() > 0) {
+	int r = remain();
+	if(r > 0) {
 		sema->releaseWithoutLock();
-		nextOut = nextNextOut();
 		fill = data[nextOut];
+		nextOut = nextNextOut();
+		if(r == 1) { // if we are now empty...
+			nextIn = -1; nextOut = 0; _reverse = false;
+		}
 	} else {
 		ret = false;
 	}
 	sema->releaseSemaLock();
 	return ret;
 }
+//template <class T,class ALLOC>
+//bool tw_safeCircular<T,ALLOC>::remove( T &fill ) {
+//	bool ret = true;
+//	sema->lockSemaOnly();
+//	if(remain() > 0) {
+//		sema->releaseWithoutLock();
+//		fill = data[nextOut];
+//		nextOut = nextNextOut();
+//	} else {
+//		ret = false;
+//	}
+//	sema->releaseSemaLock();
+//	return ret;
+//}
+
 
 #ifdef TWLIB_HAS_MOVE_SEMANTICS
 template <class T,class ALLOC>
 bool tw_safeCircular<T,ALLOC>::removeMv( T &fill ) {
 	bool ret = true;
 	sema->lockSemaOnly();
-	if(remain() > 0) {
+	int r = remain();
+	if(r > 0) {
 		sema->releaseWithoutLock();
-		nextOut = nextNextOut();
 		fill = std::move(data[nextOut]);
+		nextOut = nextNextOut();
+		if(r == 1) { // if we are now empty...
+			nextIn = -1; nextOut = 0; _reverse = false;
+		}
 	} else {
 		ret = false;
 	}
@@ -701,11 +735,15 @@ bool tw_safeCircular<T,ALLOC>::removeOrBlock( T &fill ) {
 	bool ret = true;
 	sema->lockSemaOnly();
 	TW_CIRCULAR_DBG_OUT("removeOrBlock.. remain = %d", remain());
-	if(remain() > 0) {
+	int rm = remain();
+	if(rm > 0) {
 		sema->releaseWithoutLock();
 		TW_CIRCULAR_DBG_OUT("   ...removeOrBlock(2).. remain = %d", remain());
 		nextOut = nextNextOut();
 		fill = data[nextOut];
+		if(rm == 1) { // if we are now empty...
+			nextIn = -1; nextOut = 0; _reverse = false;
+		}
 		sema->releaseSemaLock();
 	} else {
 		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(%d) waitForAcquirers", remain());
@@ -714,6 +752,9 @@ bool tw_safeCircular<T,ALLOC>::removeOrBlock( T &fill ) {
 			TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers complete. remain = %d", remain());
 			sema->releaseWithoutLock();
 			nextOut = nextNextOut();
+			if(remain() == 0) { // if we are now empty...
+				nextIn = -1; nextOut = 0; _reverse = false;
+			}
 			fill = data[nextOut];
 		} else {
 			ret = false;
@@ -729,11 +770,15 @@ bool tw_safeCircular<T,ALLOC>::removeOrBlock( T &fill, const int64_t usec_wait )
 	bool ret = true;
 	sema->lockSemaOnly();
 	TW_CIRCULAR_DBG_OUT("removeOrBlock.. remain = %d", remain());
-	if(remain() > 0) {
+	int rm = remain();
+	if(rm > 0) {
 		sema->releaseWithoutLock();
 		TW_CIRCULAR_DBG_OUT("   ...removeOrBlock(2).. remain = %d", remain());
 		nextOut = nextNextOut();
 		fill = data[nextOut];
+		if(rm == 1) { // if we are now empty...
+			nextIn = -1; nextOut = 0; _reverse = false;
+		}
 		sema->releaseSemaLock();
 	} else {
 		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(%d) waitForAcquirers", remain());
@@ -742,6 +787,9 @@ bool tw_safeCircular<T,ALLOC>::removeOrBlock( T &fill, const int64_t usec_wait )
 			TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers complete. remain = %d", remain());
 			sema->releaseWithoutLock();
 			nextOut = nextNextOut();
+			if(remain() == 0) { // if we are now empty...
+				nextIn = -1; nextOut = 0; _reverse = false;
+			}
 			fill = data[nextOut];
 		} else {
 			ret = false;
@@ -759,11 +807,15 @@ bool tw_safeCircular<T,ALLOC>::removeMvOrBlock( T &fill ) {
 	bool ret = true;
 	sema->lockSemaOnly();
 	TW_CIRCULAR_DBG_OUT("removeOrBlock.. remain = %d", remain());
-	if(remain() > 0) {
+	int rm = remain();
+	if(rm > 0) {
 		sema->releaseWithoutLock();
 		TW_CIRCULAR_DBG_OUT("   ...removeOrBlock(2).. remain = %d", remain());
 		nextOut = nextNextOut();
 		fill = std::move(data[nextOut]);
+		if(rm == 1) { // if we are now empty...
+			nextIn = -1; nextOut = 0; _reverse = false;
+		}
 		sema->releaseSemaLock();
 	} else {
 		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(%d) waitForAcquirers", remain());
@@ -772,6 +824,9 @@ bool tw_safeCircular<T,ALLOC>::removeMvOrBlock( T &fill ) {
 			TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers complete. remain = %d", remain());
 			sema->releaseWithoutLock();
 			nextOut = nextNextOut();
+			if(remain() == 0) { // if we are now empty...
+				nextIn = -1; nextOut = 0; _reverse = false;
+			}
 			fill = std::move(data[nextOut]);
 		} else {
 			ret = false;
@@ -780,7 +835,6 @@ bool tw_safeCircular<T,ALLOC>::removeMvOrBlock( T &fill ) {
 		sema->releaseSemaLock();
 	}
 	return ret;
-
 }
 
 template <class T,class ALLOC>
@@ -788,11 +842,15 @@ bool tw_safeCircular<T,ALLOC>::removeMvOrBlock( T &fill, const int64_t usec_wait
 	bool ret = true;
 	sema->lockSemaOnly();
 	TW_CIRCULAR_DBG_OUT("removeOrBlock.. remain = %d", remain());
-	if(remain() > 0) {
+	int rm = remain();
+	if(rm > 0) {
 		sema->releaseWithoutLock();
 		TW_CIRCULAR_DBG_OUT("   ...removeOrBlock(2).. remain = %d", remain());
 		nextOut = nextNextOut();
 		fill = std::move(data[nextOut]);
+		if(rm == 1) { // if we are now empty...
+			nextIn = -1; nextOut = 0; _reverse = false;
+		}
 		sema->releaseSemaLock();
 	} else {
 		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(%d) waitForAcquirers", remain());
@@ -801,6 +859,9 @@ bool tw_safeCircular<T,ALLOC>::removeMvOrBlock( T &fill, const int64_t usec_wait
 			TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers complete. remain = %d", remain());
 			sema->releaseWithoutLock();
 			nextOut = nextNextOut();
+			if(remain() == 0) { // if we are now empty...
+				nextIn = -1; nextOut = 0; _reverse = false;
+			}
 			fill = std::move(data[nextOut]);
 		} else {
 			ret = false;
@@ -809,7 +870,6 @@ bool tw_safeCircular<T,ALLOC>::removeMvOrBlock( T &fill, const int64_t usec_wait
 		sema->releaseSemaLock();
 	}
 	return ret;
-
 }
 
 #endif
@@ -884,8 +944,22 @@ int tw_safeCircular<T,ALLOC>::remaining(void) {
 }
 
 template <class T,class ALLOC>
-void tw_safeCircular<T,ALLOC>::clearAll() { // delete all remaining links (and hope someone took care of the data in each of those)
-
+void tw_safeCircular<T,ALLOC>::clear() { // delete all remaining links (and hope someone took care of the data in each of those)
+//	sema->releaseAll();
+	sema->lockSemaOnly();
+	if(isObjects) { // cleanup objects if needed. and rebuild empty ones
+		for(int n=0;n<_size;n++) {
+			data[n].~T();
+		}
+		for(int n=0;n<_size;n++) {
+			T *p = data + n;
+			p = new (p) T(); // placement new, if objects require an init.
+		}
+	}
+	nextIn = -1; nextOut = 0;  // reset back to beginning (just like cstor)
+	_reverse = false; enabled=true;
+	sema->resetNoLock();
+	sema->releaseSemaLock();
 }
 
 template <class T,class ALLOC>
@@ -898,18 +972,13 @@ void tw_safeCircular<T,ALLOC>::unblockAll() {
 template <class T,class ALLOC>
 tw_safeCircular<T,ALLOC>::~tw_safeCircular() { // delete all remaining links (and hope someone took care of the data in each of those)
 	unblockAll();
-	pthread_mutex_lock(&newDataMutex);
+	sema->lockSemaOnly();
 	if(isObjects) { // cleanup objects if needed
-		int end = nextOut;
-		do {
-			data[nextOut].~T();
-			nextOut++;
-			if(nextOut > _size) nextOut = 0;
-		} while(nextOut != end);
+		for(int n=0;n<_size;n++) {
+			data[n].~T();
+		}
 	}
-	pthread_cond_destroy(&newdataCond);   // NEW
-	pthread_mutex_unlock(&newDataMutex);
-	pthread_mutex_destroy(&newDataMutex);    // NEW
+	sema->releaseSemaLock();
 	// Should call pthread_cond_destroy
 }
 
