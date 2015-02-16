@@ -21,14 +21,24 @@
 
 #include <TW/tw_utils.h>
 
-//#define _TW_SEMA_HEAVY_DEBUG
+//#define _TW_SEMA2_HEAVY_DEBUG
 
-#ifdef _TW_SEMA_HEAVY_DEBUG
+#ifdef _TW_SEMA2_HEAVY_DEBUG
 #include <stdio.h>
 #endif
 
 namespace TWlib {
 
+
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+#define SEMA2_MUTEX_LOCK(m)  { printf ("*** SEMA2 **** line %d ** Mutex Lock %p\n",__LINE__,this); \
+	pthread_mutex_lock(m); }
+#define SEMA2_MUTEX_UNLOCK(m) { printf ("*** SEMA2 **** line %d ** Mutex Unlock %p\n",__LINE__,this); \
+	pthread_mutex_unlock(m); }
+#else
+#define SEMA2_MUTEX_LOCK(m) pthread_mutex_lock(m)
+#define SEMA2_MUTEX_UNLOCK(m) pthread_mutex_unlock(m)
+#endif
 
 /**
  * A two-way semaphore class. Will signal when counter is above zero, or when it decrements.
@@ -45,6 +55,7 @@ protected:
 	pthread_cond_t gtZeroCond;    // signaled when the count is larger than zero
 	pthread_cond_t decrementCond; // signaled when the count goes down
 public:
+	TW_SemaTwoWay() = delete;
 	TW_SemaTwoWay(int init_count) :
 	cnt( init_count ), size( init_count )
 	{
@@ -55,9 +66,9 @@ public:
 
 
 	void reset() {
-		pthread_mutex_lock( &localMutex );
+		SEMA2_MUTEX_LOCK( &localMutex );
 		cnt = size;
-		pthread_mutex_unlock( &localMutex );
+		SEMA2_MUTEX_UNLOCK( &localMutex );
 	}
 
 	void resetNoLock() {
@@ -71,15 +82,15 @@ public:
 	 */
 	int acquire() {
 		int ret = 0;
-		pthread_mutex_lock( &localMutex );
+		SEMA2_MUTEX_LOCK( &localMutex );
 		while(cnt < 1) {
-#ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA wait (acquire) [%p]\n",this);
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+			printf ("TW_SEMA2 wait (acquire) [%p]\n",this);
 #endif
 			ret = pthread_cond_wait( &gtZeroCond, &localMutex ); // wait for change in cnt
 			if(ret) {
-#ifdef _TW_SEMA_HEAVY_DEBUG
-				printf ("TW_SEMA acquire error (errno %d) (cnt=%d) [%p]\n",ret, cnt, this);
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+				printf ("TW_SEMA2 acquire error (errno %d) (cnt=%d) [%p]\n",ret, cnt, this);
 #endif
 				break;
 			}
@@ -88,21 +99,21 @@ public:
 			cnt--;
 			pthread_cond_signal( &decrementCond );
 		}
-		pthread_mutex_unlock( &localMutex );
+		SEMA2_MUTEX_UNLOCK( &localMutex );
 		return ret;
 	}
 
 	int acquire(const struct timespec *abstime) {
 		int ret = 0;
-		pthread_mutex_lock( &localMutex );
+		SEMA2_MUTEX_LOCK( &localMutex );
 		while(cnt < 1) {
-#ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA wait (acquire) [%p]\n",this);
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+			printf ("TW_SEMA2 wait (acquire) [%p]\n",this);
 #endif
 			ret = pthread_cond_timedwait( &gtZeroCond, &localMutex, abstime ); // wait for change in cnt
 			if(ret) {
-#ifdef _TW_SEMA_HEAVY_DEBUG
-				printf ("TW_SEMA acquire error (errno %d) (cnt=%d) [%p]\n",ret, cnt, this);
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+				printf ("TW_SEMA2 acquire error (errno %d) (cnt=%d) [%p]\n",ret, cnt, this);
 #endif
 				break;
 			}
@@ -111,22 +122,22 @@ public:
 			cnt--;
 			pthread_cond_signal( &decrementCond );
 		}
-		pthread_mutex_unlock( &localMutex );
+		SEMA2_MUTEX_UNLOCK( &localMutex );
 		return ret;
 	}
 
 	int acquireAndKeepLock() {
 		int ret = 0;
-		pthread_mutex_lock( &localMutex );
+		SEMA2_MUTEX_LOCK( &localMutex );
 		while(1) {
-#ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA acquire wait (cnt=%d) [%p]\n",cnt, this);
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+			printf ("TW_SEMA2 acquire wait (cnt=%d) [%p]\n",cnt, this);
 #endif
 			if(cnt >= 1) break;
 			ret = pthread_cond_wait( &gtZeroCond, &localMutex ); // wait for change in cnt
 			if(ret) {
-#ifdef _TW_SEMA_HEAVY_DEBUG
-				printf ("TW_SEMA acquire error (errno %d) (cnt=%d) [%p]\n",ret, cnt, this);
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+				printf ("TW_SEMA2 acquire error (errno %d) (cnt=%d) [%p]\n",ret, cnt, this);
 #endif
 				break;
 			}
@@ -140,7 +151,7 @@ public:
 
 	bool acquireAndKeepLockNoBlock() {
 		bool ret = false;
-		pthread_mutex_lock( &localMutex );
+		SEMA2_MUTEX_LOCK( &localMutex );
 		if(cnt >= 1) {
 			cnt--;
 			pthread_cond_signal( &decrementCond );
@@ -151,15 +162,15 @@ public:
 
 	int acquireAndKeepLock(const struct timespec *abstime) {
 		int ret = 0;
-		pthread_mutex_lock( &localMutex );
+		SEMA2_MUTEX_LOCK( &localMutex );
 		while(1) {
-#ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA acquire wait (cnt=%d) [%p]\n",cnt, this);
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+			printf ("TW_SEMA2 acquire wait (cnt=%d) [%p]\n",cnt, this);
 #endif
 			if(cnt >= 1) break;
 			ret = pthread_cond_timedwait( &gtZeroCond, &localMutex, abstime ); // wait for change in cnt
 			if(ret) {
-#ifdef _TW_SEMA_HEAVY_DEBUG
+#ifdef _TW_SEMA2_HEAVY_DEBUG
 				printf ("TW_SEMA acquire error or timeout (errno %d) (cnt=%d) [%p]\n",ret, cnt, this);
 #endif
 				break;
@@ -196,35 +207,35 @@ public:
 	}
 
 	void lockSemaOnly() {
-		pthread_mutex_lock( &localMutex );
+		SEMA2_MUTEX_LOCK( &localMutex );
 	}
 
 
 	void releaseSemaLock() {
-		pthread_mutex_unlock( &localMutex );
+		SEMA2_MUTEX_UNLOCK( &localMutex );
 	}
 
 	int waitForAcquirers(bool lock = true) {
 		int ret = 0;
 		if(lock)
-			pthread_mutex_lock( &localMutex );
+			SEMA2_MUTEX_LOCK( &localMutex );
 		while(1) {
 			if(cnt >= size)
 				ret = pthread_cond_wait( &decrementCond, &localMutex );
 		}
-		pthread_mutex_unlock( &localMutex );
+		SEMA2_MUTEX_UNLOCK( &localMutex );
 		return ret;
 	}
 
 	int waitForAcquirers(const struct timespec *abstime, bool lock = true) {
 		int ret = 0;
 		if(lock)
-			pthread_mutex_lock( &localMutex );
+			SEMA2_MUTEX_LOCK( &localMutex );
 		while(1) {
 			if(cnt >= size)
 				ret = pthread_cond_timedwait( &decrementCond, &localMutex, abstime );
 		}
-		pthread_mutex_unlock( &localMutex );
+		SEMA2_MUTEX_UNLOCK( &localMutex );
 		return ret;
 	}
 
@@ -241,16 +252,16 @@ public:
 	int waitForAcquirersKeepLock(bool lock = true) {
 		int ret = 0;
 		if(lock)
-			pthread_mutex_lock( &localMutex );
+			SEMA2_MUTEX_LOCK( &localMutex );
 		while(1) {
 			if(cnt < size) break;
-#ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA waitForAcquirers decrement (cnt=%d) [%p]\n",cnt, this);
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+			printf ("TW_SEMA2 waitForAcquirers decrement (cnt=%d) [%p]\n",cnt, this);
 			if(cnt > size) printf("EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEK!!!\n");
 #endif
 			ret = pthread_cond_wait( &decrementCond, &localMutex );
-#ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA got decrement (cnt=%d)\n",cnt);
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+			printf ("TW_SEMA2 got decrement (cnt=%d)\n",cnt);
 #endif
 		}
 		return ret;
@@ -260,17 +271,17 @@ public:
 	int waitForAcquirersKeepLock(const struct timespec *abstime, bool lock = true) {
 		int ret = 0;
 		if(lock)
-			pthread_mutex_lock( &localMutex );
+			SEMA2_MUTEX_LOCK( &localMutex );
 		while(1) {
 			if(cnt < size) break;
-#ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA waitForAcquirers decrement (cnt=%d) [%p]\n",cnt, this);
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+			printf ("TW_SEMA2 waitForAcquirers decrement (cnt=%d) [%p]\n",cnt, this);
 			if(cnt > size) printf("EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEK!!!\n");
 #endif
 			ret = pthread_cond_timedwait( &decrementCond, &localMutex, abstime );
-#ifdef _TW_SEMA_HEAVY_DEBUG
-			if(!ret) printf ("TW_SEMA got decrement (cnt=%d)\n",cnt);
-			else printf("TW_SEMA got error or timeout (cnt=%d)\n",cnt);
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+			if(!ret) printf ("TW_SEMA2 got decrement (cnt=%d)\n",cnt);
+			else printf("TW_SEMA2 got error or timeout (cnt=%d)\n",cnt);
 #endif
 		}
 		return ret;
@@ -287,7 +298,7 @@ public:
 	}
 
 	int waitForDecrementKeepLock(const struct timespec *abstime, bool lock = true) {
-		if(lock) pthread_mutex_lock( &localMutex );
+		if(lock) SEMA2_MUTEX_LOCK( &localMutex );
 		return pthread_cond_timedwait( &decrementCond, &localMutex, abstime );
 	}
 
@@ -298,7 +309,7 @@ public:
 		TWlib::add_usec_to_timeval(usec_wait, &tv);
 		TWlib::timeval_to_timespec(&tv,&ts);
 		if(lock)
-			pthread_mutex_lock( &localMutex );
+			SEMA2_MUTEX_LOCK( &localMutex );
 		return pthread_cond_timedwait( &decrementCond, &localMutex, &ts );
 	}
 
@@ -338,14 +349,14 @@ public:
 //		int ret = 0;
 //		pthread_mutex_lock( &localMutex );
 //		if(cnt < 1) {
-//#ifdef _TW_SEMA_HEAVY_DEBUG
-//			printf ("TW_SEMA timedwait [%p]\n",this);
+//#ifdef _TW_SEMA2_HEAVY_DEBUG
+//			printf ("TW_SEMA2 timedwait [%p]\n",this);
 //#endif
 //			ret = pthread_cond_timedwait( &gtZeroCond, &localMutex, abstime ); // wait for change in cnt
 //			if(ret == 0) {// if we waited successfully, and no timeout
 //				cnt--;   //   the decrement the count down one
-//#ifdef _TW_SEMA_HEAVY_DEBUG
-//				printf ("TW_SEMA decrementing [%p]\n",this);
+//#ifdef _TW_SEMA2_HEAVY_DEBUG
+//				printf ("TW_SEMA2 decrementing [%p]\n",this);
 //#endif
 //			}
 //		}
@@ -353,7 +364,7 @@ public:
 ////			delete this;
 ////		else
 //		pthread_mutex_unlock( &localMutex );
-////		printf ("TW_SEMA acquire done\n");
+////		printf ("TW_SEMA2 acquire done\n");
 //		return ret;
 //	}
 //
@@ -361,14 +372,14 @@ public:
 //		int ret = 0;
 //		pthread_mutex_lock( &localMutex );
 //		if(cnt < 1) {
-//#ifdef _TW_SEMA_HEAVY_DEBUG
-//			printf ("TW_SEMA timedwait [%p]\n",this);
+//#ifdef _TW_SEMA2_HEAVY_DEBUG
+//			printf ("TW_SEMA2 timedwait [%p]\n",this);
 //#endif
 //			ret = pthread_cond_timedwait( &gtZeroCond, &localMutex, abstime ); // wait for change in cnt
 //			if(ret == 0) {// if we waited successfully, and no timeout
 //				cnt--;   //   the decrement the count down one
-//#ifdef _TW_SEMA_HEAVY_DEBUG
-//				printf ("TW_SEMA decrementing [%p]\n",this);
+//#ifdef _TW_SEMA2_HEAVY_DEBUG
+//				printf ("TW_SEMA2 decrementing [%p]\n",this);
 //#endif
 //			}
 //		}
@@ -385,18 +396,18 @@ public:
 	 */
 	int release() {
 		int ret = 0;
-		pthread_mutex_lock( &localMutex );
-#ifdef _TW_SEMA_HEAVY_DEBUG
-		printf ("TW_SEMA (release) incrementing [%p]\n",this);
+		SEMA2_MUTEX_LOCK( &localMutex );
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+		printf ("TW_SEMA2 (release) incrementing [%p]\n",this);
 #endif
 		cnt++;
 		if(cnt > 0) { // the 'if' should not be necessary
 			ret = pthread_cond_signal( &gtZeroCond );
-#ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA signaled [%p]\n",this);
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+			printf ("TW_SEMA2 signaled [%p]\n",this);
 #endif
 		}
-		pthread_mutex_unlock( &localMutex );
+		SEMA2_MUTEX_UNLOCK( &localMutex );
 		return ret;
 	}
 
@@ -404,13 +415,13 @@ public:
 	int releaseWithoutLock() {
 		int ret = 0;
 		cnt++;
-#ifdef _TW_SEMA_HEAVY_DEBUG
-		printf ("TW_SEMA (release) incrementing (%d) [%p]\n",cnt, this);
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+		printf ("TW_SEMA2 (release) incrementing (%d) [%p]\n",cnt, this);
 #endif
 		if(cnt > 0) { // the 'if' should not be necessary
 			ret = pthread_cond_signal( &gtZeroCond );
-#ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA signaled [%p]\n",this);
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+			printf ("TW_SEMA2 signaled [%p]\n",this);
 #endif
 		}
 		return ret;
@@ -421,15 +432,15 @@ public:
 	 */
 	int releaseAndKeepLock() {
 		int ret = 0;
-		pthread_mutex_lock( &localMutex );
-#ifdef _TW_SEMA_HEAVY_DEBUG
-		printf ("TW_SEMA (release) incrementing [%p]\n",this);
+		SEMA2_MUTEX_LOCK( &localMutex );
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+		printf ("TW_SEMA2 (release) incrementing [%p]\n",this);
 #endif
 		cnt++;
 		if(cnt > 0) // the 'if' should not be necessary
 			ret = pthread_cond_signal( &gtZeroCond );
-#ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA signaled [%p]\n",this);
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+			printf ("TW_SEMA2 signaled [%p]\n",this);
 #endif
 		return ret;
 	}
@@ -442,18 +453,18 @@ public:
 	 */
 	int releaseAll() {
 		int ret = 0;
-		pthread_mutex_lock( &localMutex );
-#ifdef _TW_SEMA_HEAVY_DEBUG
-		printf ("TW_SEMA incrementing [%p]\n",this);
+		SEMA2_MUTEX_LOCK( &localMutex );
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+		printf ("TW_SEMA2 incrementing [%p]\n",this);
 #endif
 		cnt++;
 //		if(cnt > 0) // the 'if' should not be necessary
 		pthread_cond_broadcast( &decrementCond );
 		ret = pthread_cond_broadcast( &gtZeroCond );
-#ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA signaled [%p]\n",this);
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+			printf ("TW_SEMA2 signaled [%p]\n",this);
 #endif
-		pthread_mutex_unlock( &localMutex );
+		SEMA2_MUTEX_UNLOCK( &localMutex );
 		return ret;
 	}
 
@@ -463,9 +474,9 @@ public:
 	 */
 	int count() {
 		int ret = 0;
-		pthread_mutex_lock( &localMutex );
+		SEMA2_MUTEX_LOCK( &localMutex );
 		ret = cnt;
-		pthread_mutex_unlock( &localMutex );
+		SEMA2_MUTEX_UNLOCK( &localMutex );
 		return ret;
 	}
 
@@ -495,16 +506,16 @@ public:
 */
 
 	~TW_SemaTwoWay() {
-#ifdef _TW_SEMA_HEAVY_DEBUG
-			printf ("TW_SEMA DESTRUCTOR [%p]\n",this);
+#ifdef _TW_SEMA2_HEAVY_DEBUG
+			printf ("TW_SEMA2 DESTRUCTOR [%p]\n",this);
 #endif
 //		if(!deleteOnZero) // if deleteOnZero is set, then this mutex is locked already
-		pthread_mutex_lock( &localMutex );  // yes, order is important here...
+		SEMA2_MUTEX_LOCK( &localMutex );  // yes, order is important here...
 		pthread_cond_broadcast( &gtZeroCond );
 		pthread_cond_broadcast( &decrementCond );
 		pthread_cond_destroy( &gtZeroCond );
 		pthread_cond_destroy( &decrementCond );
-		pthread_mutex_unlock( &localMutex );
+		SEMA2_MUTEX_UNLOCK( &localMutex );
 		pthread_mutex_destroy( &localMutex );
 
 	}
@@ -512,4 +523,4 @@ public:
 
 } // end namespace
 
-#endif /* TW_SEMA_H_ */
+#endif /* TW_SEMA2_H_ */
