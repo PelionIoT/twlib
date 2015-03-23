@@ -486,6 +486,12 @@ public:
 		return ret;
 	}
 
+	void releaseAllAcquireLocks() {
+		SEMA2_MUTEX_LOCK( &localMutex );
+		pthread_cond_broadcast( &decrementCond );
+		SEMA2_MUTEX_UNLOCK( &localMutex );
+	}
+
 	/**
 	 * returns the current count (value) on the semaphore
 	 * @return

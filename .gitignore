@@ -27,3 +27,4 @@ test_rbtree
 /test_twcircular_slow_consumer
 /test_twcircular_array
 /.csettings/
+/test_twcircular_unblockall

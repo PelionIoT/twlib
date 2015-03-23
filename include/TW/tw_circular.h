@@ -104,6 +104,7 @@ public:
 	void clear(); // remove all nodes (does not delete T)
 //	void unblock();  // unblock 1 blocking call
 	void unblockAll(); // unblock all blocking calls
+	void unblockAllRemovers();
 	void disable();
 	void enable();
 
@@ -688,11 +689,22 @@ void tw_safeCircular<T,ALLOC>::clear() { // delete all remaining links (and hope
 	sema.releaseSemaLock();
 }
 
+/**
+ * Unblocks everything. NOTE: The queue is not safe to use after calling this, and should be discarded.
+ * Use unblockAllRemovers() to safely unblock all removal calls.
+ */
 template <class T,class ALLOC>
 void tw_safeCircular<T,ALLOC>::unblockAll() {
 	sema.releaseAll();
 }
 
+/**
+ * Unblocks all calls involving element removal. Those calls will fail gracefully with a false.
+ */
+template <class T,class ALLOC>
+void tw_safeCircular<T,ALLOC>::unblockAllRemovers() {
+	sema.releaseAllAcquireLocks();
+}
 
 
 template <class T,class ALLOC>
