@@ -533,7 +533,7 @@ bool tw_safeCircular<T,ALLOC>::removeOrBlock( T &fill ) {
 	} else {
 		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(%d) waitForAcquirers", remain());
 		int r = sema.waitForAcquirersKeepLock(false); // unlocks while waiting for acquire
-		if(!r) {
+		if(r == 0) {
 			TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers complete. remain = %d", remain());
 			sema.releaseWithoutLock();
 			nextOut = nextNextOut();
@@ -568,7 +568,7 @@ bool tw_safeCircular<T,ALLOC>::removeOrBlock( T &fill, const int64_t usec_wait )
 	} else {
 		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(%d) waitForAcquirers", remain());
 		int r = sema.waitForAcquirersKeepLock(usec_wait, false); // unlocks while waiting for acquire
-		if(!r) {
+		if(r == 0) {
 			TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers complete. remain = %d", remain());
 			sema.releaseWithoutLock();
 			nextOut = nextNextOut();
@@ -605,7 +605,7 @@ bool tw_safeCircular<T,ALLOC>::removeMvOrBlock( T &fill ) {
 	} else {
 		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(%d) waitForAcquirers", remain());
 		int r = sema.waitForAcquirersKeepLock(false); // unlocks while waiting for acquire
-		if(!r) {
+		if(r == 0) {
 			TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers complete. remain = %d", remain());
 			sema.releaseWithoutLock();
 			nextOut = nextNextOut();
@@ -640,7 +640,7 @@ bool tw_safeCircular<T,ALLOC>::removeMvOrBlock( T &fill, const int64_t usec_wait
 	} else {
 		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(%d) waitForAcquirers", remain());
 		int r = sema.waitForAcquirersKeepLock(usec_wait, false); // unlocks while waiting for acquire
-		if(!r) {
+		if(r == 0) {
 			TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers complete. remain = %d", remain());
 			sema.releaseWithoutLock();
 			nextOut = nextNextOut();

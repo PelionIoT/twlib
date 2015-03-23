@@ -119,7 +119,6 @@ void *consumer( void *ptr ) {
 				printf("x");
 				sleep(1);  // obviously not good in the real world, but for test case
 			}
-
 		}
 		x--;
 	}

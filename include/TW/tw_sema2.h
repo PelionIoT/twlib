@@ -219,10 +219,14 @@ public:
 		int ret = 0;
 		if(lock)
 			SEMA2_MUTEX_LOCK( &localMutex );
-		while(1) {
-			if(cnt >= size)
+//		while(1) {
+		    //  if(cnt < size) break;
+			if(cnt >= size) {
 				ret = pthread_cond_wait( &decrementCond, &localMutex );
-		}
+				if(cnt >= size) // new
+					ret = -1;   // new
+			}
+//		}
 		SEMA2_MUTEX_UNLOCK( &localMutex );
 		return ret;
 	}
@@ -231,10 +235,14 @@ public:
 		int ret = 0;
 		if(lock)
 			SEMA2_MUTEX_LOCK( &localMutex );
-		while(1) {
-			if(cnt >= size)
+//		while(1) {
+//			if(cnt < size) break;
+			if(cnt >= size) {
 				ret = pthread_cond_timedwait( &decrementCond, &localMutex, abstime );
-		}
+				if(cnt >= size) // new
+					ret = -1;   // new
+			}
+//		}
 		SEMA2_MUTEX_UNLOCK( &localMutex );
 		return ret;
 	}
@@ -253,17 +261,22 @@ public:
 		int ret = 0;
 		if(lock)
 			SEMA2_MUTEX_LOCK( &localMutex );
-		while(1) {
-			if(cnt < size) break;
+//		while(1) {
+//			if(cnt < size) break;
 #ifdef _TW_SEMA2_HEAVY_DEBUG
 			printf ("TW_SEMA2 waitForAcquirers decrement (cnt=%d) [%p]\n",cnt, this);
 			if(cnt > size) printf("EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEK!!!\n");
 #endif
-			ret = pthread_cond_wait( &decrementCond, &localMutex );
+			if(cnt>=size) {
+				ret = pthread_cond_wait( &decrementCond, &localMutex );
+				if(cnt >= size) // new
+					ret = -1;   // new
 #ifdef _TW_SEMA2_HEAVY_DEBUG
-			printf ("TW_SEMA2 got decrement (cnt=%d)\n",cnt);
+				else
+					printf ("TW_SEMA2 got decrement (cnt=%d)\n",cnt);
 #endif
-		}
+			}
+//		}
 		return ret;
 	}
 
@@ -272,18 +285,23 @@ public:
 		int ret = 0;
 		if(lock)
 			SEMA2_MUTEX_LOCK( &localMutex );
-		while(1) {
-			if(cnt < size) break;
+//		while(1) {
+//			if(cnt < size) break;
 #ifdef _TW_SEMA2_HEAVY_DEBUG
 			printf ("TW_SEMA2 waitForAcquirers decrement (cnt=%d) [%p]\n",cnt, this);
 			if(cnt > size) printf("EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEK!!!\n");
 #endif
-			ret = pthread_cond_timedwait( &decrementCond, &localMutex, abstime );
+			if(cnt>=size) {
+				ret = pthread_cond_wait( &decrementCond, &localMutex );
+				if(cnt >= size) // new
+					ret = -1;   // new
+			}
+//			ret = pthread_cond_timedwait( &decrementCond, &localMutex, abstime );
 #ifdef _TW_SEMA2_HEAVY_DEBUG
-			if(!ret) printf ("TW_SEMA2 got decrement (cnt=%d)\n",cnt);
-			else printf("TW_SEMA2 got error or timeout (cnt=%d)\n",cnt);
+			if(ret == 0) printf ("TW_SEMA2 got decrement (cnt=%d)\n",cnt);
+			else printf("TW_SEMA2 got error or timeout or other wakeup (cnt=%d)\n",cnt);
 #endif
-		}
+//		}
 		return ret;
 	}
 

@@ -116,13 +116,13 @@ void *consumer( void *ptr ) {
 				cnt++;
 				printf("<<< Consumer %d: removed %d\n\n",inf->threadnum, D.x);
 				TOTAL--;
+				x--;
 				break;
 			} else {
 				printf(" * ");
 			}
 
 		}
-		x--;
 	}
 	printf("Consumer %d done!!!\n", inf->threadnum);
 	OUTPUT[inf->threadnum] = cnt;

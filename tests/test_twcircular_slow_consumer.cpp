@@ -123,12 +123,12 @@ void *consumer( void *ptr ) {
 			cnt++;
 			printf("<<< Consumer %d: removed %d\n\n",inf->threadnum, D.x);
 			TOTAL--;
+			x--;
 		} else {
-			printf("<<< Consumer %d: error - bad remove\n\n", inf->threadnum);
+			printf("<<< Consumer %d: failed remove\n\n", inf->threadnum);
 		}
 		if(x % 5 == 0)
 			sleep(1);
-		x--;
 	}
 	printf("Consumer %d done!!!\n", inf->threadnum);
 	OUTPUT[inf->threadnum] = cnt;
