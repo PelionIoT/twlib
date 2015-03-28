@@ -526,10 +526,10 @@ bool tw_safeCircular<T,ALLOC>::removeOrBlock( T &fill ) {
 		sema.releaseWithoutLock();
 		TW_CIRCULAR_DBG_OUT("   ...removeOrBlock(2).. remain = %d", remain());
 		nextOut = nextNextOut();
-		fill = data[nextOut];
 		if(rm == 1) { // if we are now empty...
 			nextIn = -1; nextOut = 0; _reverse = false;
 		}
+		fill = data[nextOut];
 		sema.releaseSemaLock();
 	} else {
 		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(%d) waitForAcquirers", remain());
@@ -561,10 +561,10 @@ bool tw_safeCircular<T,ALLOC>::removeOrBlock( T &fill, const int64_t usec_wait )
 		sema.releaseWithoutLock();
 		TW_CIRCULAR_DBG_OUT("   ...removeOrBlock(2).. remain = %d", remain());
 		nextOut = nextNextOut();
-		fill = data[nextOut];
 		if(rm == 1) { // if we are now empty...
 			nextIn = -1; nextOut = 0; _reverse = false;
 		}
+		fill = data[nextOut];
 		sema.releaseSemaLock();
 	} else {
 		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(%d) waitForAcquirers", remain());
@@ -598,10 +598,10 @@ bool tw_safeCircular<T,ALLOC>::removeMvOrBlock( T &fill ) {
 		sema.releaseWithoutLock();
 		TW_CIRCULAR_DBG_OUT("   ...removeOrBlock(2).. remain = %d", remain());
 		nextOut = nextNextOut();
-		fill = std::move(data[nextOut]);
 		if(rm == 1) { // if we are now empty...
 			nextIn = -1; nextOut = 0; _reverse = false;
 		}
+		fill = std::move(data[nextOut]);
 		sema.releaseSemaLock();
 	} else {
 		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(%d) waitForAcquirers", remain());
@@ -633,10 +633,10 @@ bool tw_safeCircular<T,ALLOC>::removeMvOrBlock( T &fill, const int64_t usec_wait
 		sema.releaseWithoutLock();
 		TW_CIRCULAR_DBG_OUT("   ...removeOrBlock(2).. remain = %d", remain());
 		nextOut = nextNextOut();
-		fill = std::move(data[nextOut]);
 		if(rm == 1) { // if we are now empty...
 			nextIn = -1; nextOut = 0; _reverse = false;
 		}
+		fill = std::move(data[nextOut]);
 		sema.releaseSemaLock();
 	} else {
 		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(%d) waitForAcquirers", remain());

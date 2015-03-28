@@ -142,7 +142,7 @@ public:
 				break;
 			}
 		}
-		if(!ret) {
+		if(ret == 0) {
 			cnt--;
 			pthread_cond_signal( &decrementCond );
 		}
