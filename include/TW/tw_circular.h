@@ -87,10 +87,16 @@ public:
 
 
 	// unimplemented-->
-	void transferFrom( tw_safeCircular<T,ALLOC> &other ); // transfer record from other to 'this' - can block
-	bool transferFromNoBlock( tw_safeCircular<T,ALLOC> &other ); // transfer record from other to 'this' -
-	                                               // wont block - false if would have blocked
+//	void transferFrom( tw_safeCircular<T,ALLOC> &other ); // transfer record from other to 'this' - can block
+//	bool transferFromNoBlock( tw_safeCircular<T,ALLOC> &other ); // transfer record from other to 'this' -
+//	                                               // wont block - false if would have blocked
 	// <--unimplemented
+
+	void cloneFrom( tw_safeCircular<T,ALLOC> &other );
+#ifdef TWLIB_HAS_MOVE_SEMANTICS
+	void transferFrom( tw_safeCircular<T,ALLOC> &other );
+#endif
+
 
 	bool remove( T &fill ); // true if got data
 #ifdef TWLIB_HAS_MOVE_SEMANTICS
@@ -123,6 +129,7 @@ public:
 		int p; // pointer into array
 	};
 
+
 	tw_safeCircular<T,ALLOC>::iter getIter();
 
 	int remaining();
@@ -134,7 +141,7 @@ protected:
 	bool enabled; // if enabled the FIFO can take new values
 //	pthread_mutex_t newDataMutex; // thread safety for FIFO
 //	pthread_cond_t newdataCond;
-	int _block_cnt;
+//	int _block_cnt;
 	// should only be called with a sema lock...
 	bool full() {
 		return (!sema.countNoBlock());
@@ -228,6 +235,93 @@ tw_safeCircular<T,ALLOC>::tw_safeCircular( int size, bool initobj ) : isObjects(
 		}
 	}
 }
+
+
+
+/**
+ * copies all values from the other circular buffer. This requires T to have a copy cstor
+ */
+template <class T,class ALLOC>
+void tw_safeCircular<T,ALLOC>::cloneFrom( tw_safeCircular &other ) {
+	sema.lockSemaOnly();
+	other.sema.lockSemaOnly();
+
+	if(data) {
+		if(isObjects) { // cleanup objects if needed
+			for(int n=0;n<_size;n++) {
+				data[n].~T();
+			}
+		}
+		ALLOC::free(data);
+	}
+
+	sema.cloneFrom(other.sema); // copy count, etc.
+	nextIn = other.nextIn;
+	nextOut = other.nextOut;
+	_size = other._size;
+	isObjects = other.isObjects;
+	_reverse = other._reverse;
+	enabled = other.enabled; // if enabled the FIFO can take new values
+
+	data = (T *) ALLOC::malloc( _size * sizeof(T) );
+
+	if(isObjects) {
+		for(int n=0;n<_size;n++) {
+			T *p = data + n;
+			p = new (p) T(other.data[n]); // placement new, if objects require an init.
+		}
+	}
+
+	other.sema.releaseSemaLock();
+	sema.releaseSemaLock();
+}
+
+
+#ifdef TWLIB_HAS_MOVE_SEMANTICS
+/**
+ * transfer all values from the other circular buffer. This requires T to have a move cstor
+ */
+template <class T,class ALLOC>
+void tw_safeCircular<T,ALLOC>::transferFrom( tw_safeCircular &other ) {
+	sema.lockSemaOnly();
+	other.sema.lockSemaOnly();
+
+	if(data) {
+		if(isObjects) { // cleanup objects if needed
+			for(int n=0;n<_size;n++) {
+				data[n].~T();
+			}
+		}
+		ALLOC::free(data);
+	}
+
+	sema.cloneFrom(other.sema); // copy count, etc.
+	nextIn = other.nextIn;
+	nextOut = other.nextOut;
+	_size = other._size;
+	isObjects = other.isObjects;
+	_reverse = other._reverse;
+	enabled = other.enabled; // if enabled the FIFO can take new values
+
+	data = (T *) ALLOC::malloc( _size * sizeof(T) );
+
+	if(isObjects) {
+		for(int n=0;n<_size;n++) {
+			T *p = data + n;
+			p = new (p) T(std::move(other.data[n])); // placement new, if objects require an init.
+		}
+	}
+
+	// cleanup 'other'. Note, the
+	other.sema.resetNoLock();
+	other.nextIn = -1;
+	other.nextOut = 0;
+
+	other.sema.releaseSemaLock();
+	sema.releaseSemaLock();
+}
+
+#endif
 
 /**
  * enables the circular buffer, allowing the adding of new items.
@@ -659,6 +753,7 @@ bool tw_safeCircular<T,ALLOC>::removeMvOrBlock( T &fill, const int64_t usec_wait
 }
 
 #endif
+
 
 
 

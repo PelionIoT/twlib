@@ -75,6 +75,12 @@ public:
 		cnt = size;
 	}
 
+	/** should be used only if you understand this class well */
+	void cloneFrom(TW_SemaTwoWay &other) {
+		cnt = other.cnt;
+		size = other.size;
+	}
+
 	/**
 	 * Acuire the semaphore, waiting indefinitely. Waits until the semaphore is positive, then decrements the semaphore by
 	 * one.

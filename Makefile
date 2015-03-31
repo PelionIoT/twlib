@@ -135,6 +135,9 @@ test_twcircular_unblockall: tw_lib tests/test_twcircular_unblockall.cpp $(TPLS) 
 test_twcircular_array: tw_lib tests/test_twcircular_array.cpp $(TPLS) tw_log.o tw_utils.o
 	$(CXX) $(CFLAGS) $(TWLIBFLAG) $(LDFLAGS) -g -I. -o $@ tests/$@.cpp tw_utils.o tw_log.o syscalls-$(ARCH).o $(TPLS) 
 
+test_twcircular_array_transfer: tw_lib tests/test_twcircular_array_transfer.cpp $(TPLS) tw_log.o tw_utils.o
+	$(CXX) $(CFLAGS) $(TWLIBFLAG) $(LDFLAGS) -g -I. -o $@ tests/$@.cpp tw_utils.o tw_log.o syscalls-$(ARCH).o $(TPLS) 
+
 test_twcircular_mv: tw_lib tests/test_twcircular_mv.cpp $(TPLS) tw_log.o tw_utils.o
 	$(CXX) $(CFLAGS) $(TWLIBFLAG) $(LDFLAGS) -g -I. -o $@ tests/$@.cpp tw_utils.o tw_log.o syscalls-$(ARCH).o $(TPLS) 
 
