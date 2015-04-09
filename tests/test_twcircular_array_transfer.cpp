@@ -71,11 +71,14 @@ public:
 	void *p; // some data
 };
 
+
+bool ALLOW_COPY_CSTOR = false;  // tests to make sure the right cstor is being used below...
+
 class data {
 public:
 	int x;
 	data() : x(0) {}
-	data(data &o) : x(o.x) {}
+	data(data &o) : x(o.x) { assert(ALLOW_COPY_CSTOR); }
 	data& operator=(const data& o) {
 		x = o.x;
 		return *this;
@@ -143,7 +146,7 @@ int main()
 
 
      tw_safeCircular<data, TESTAlloc > theQ3( QUEUE_SIZE, true );
-
+     ALLOW_COPY_CSTOR = true;
      theQ3.cloneFrom(theQ2);
 
      for(int n=0;n<QUEUE_SIZE;n++) {
