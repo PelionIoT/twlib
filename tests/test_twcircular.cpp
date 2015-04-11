@@ -17,20 +17,29 @@
 #include <sys/time.h>
 #include <errno.h>
 #include <string.h>
+#include <assert.h>
 
 #include <TW/tw_utils.h>
 #include <TW/tw_alloc.h>
 #include <TW/tw_sema.h>
 #include <TW/tw_circular.h>
 
+#include <sys/syscall.h>
+
+static long gettid__test() {
+	return syscall(SYS_gettid);
+}
+
+#define TPRINTF(s,...) fprintf(stderr, "(tid:%d)  " s, gettid__twcircular(), ##__VA_ARGS__ )
+
 void *print_message_function( void *ptr );
 
 #define QUEUE_SIZE 20
 #define RUN_SIZE 200
+#define UNIQUE_VALUES (RUN_SIZE/PRODUCER_THREADS)
 
 #define CONSUMER_THREADS 4
-#define PRODUCER_THREADS 2
-
+#define PRODUCER_THREADS 4
 
 #define START_VAL 0
 
@@ -70,10 +79,13 @@ public:
 	void *p; // some data
 };
 
+
+int verify[UNIQUE_VALUES];
+
 class data {
 public:
 	int x;
-	data() : x(0) {}
+	data() : x(-1000) {}
 	data(data &o) : x(o.x) {}
 
 };
@@ -81,16 +93,19 @@ public:
 void *producer( void *ptr ) {
 	threadinfo *inf = reinterpret_cast<threadinfo *>(ptr);
 	tw_safeCircular<data, TESTAlloc > *Q = reinterpret_cast<tw_safeCircular<data, TESTAlloc > *>(inf->p);
-	int x = RUN_SIZE / PRODUCER_THREADS;
+	int x = UNIQUE_VALUES;
 	int val = START_VAL;
 	data D;
+	TPRINTF("+++ Producer %d started\n\n", inf->threadnum);
 	while(x > 0) {
+		D.x = val;
+		TPRINTF(">>> Producer %d: adding %d\n", inf->threadnum, val);
+		Q->add(D);
+		TPRINTF(">>> Producer %d: added %d\n\n", inf->threadnum, val);
 		val++;
 		x--;
-		printf(">>> Producer %d: adding %d\n\n", inf->threadnum, val);
-		D.x = val;
-		Q->add(D);
 	}
+	TPRINTF("--- Producer %d done!!!\n\n", inf->threadnum);
 }
 
 void *consumer( void *ptr ) {
@@ -100,6 +115,8 @@ void *consumer( void *ptr ) {
 	int cnt = 0;
 	int tc = 0;
 	data D;
+	TPRINTF("+++ Consumer %d started\n\n", inf->threadnum);
+
 	while(x > 0) {
 		// this also works...
 //		totalMutex->acquire();
@@ -108,17 +125,24 @@ void *consumer( void *ptr ) {
 //			totalMutex->release();
 //			break;
 //		}
-		if(Q->removeOrBlock(D)) {
+		do {
+			if(Q->removeOrBlock(D)) {
 			cnt++;
-			printf("<<< Consumer %d: removed %d\n\n",inf->threadnum, D.x);
+			TPRINTF("<<< Consumer %d: removed %d\n\n",inf->threadnum, D.x);
+			totalMutex->acquire();
+			assert(D.x >= 0);
+			verify[D.x] = verify[D.x] + 1;
+			totalMutex->release();
 			TOTAL--;
 			x--;
-		} else {
-			printf("<<< Consumer %d: failed remove\n\n", inf->threadnum);
-		}
+			break;
+			} else {
+				TPRINTF("<<< Consumer %d: failed remove\n\n", inf->threadnum);
+			}
+		} while(1);
 //		totalMutex->release();
 	}
-	printf("Consumer %d done!!!\n", inf->threadnum);
+	TPRINTF("--- Consumer %d done!!!\n\n", inf->threadnum);
 	OUTPUT[inf->threadnum] = cnt;
 }
 
@@ -130,6 +154,8 @@ int main()
 	pthread_t consumert[CONSUMER_THREADS];
 	pthread_t producert[PRODUCER_THREADS];
 
+
+	memset(verify,0,sizeof(verify));
 
 	for (int x=0;x<CONSUMER_THREADS;x++)
 		OUTPUT[x] = 0;
@@ -149,6 +175,8 @@ int main()
     	 inf->threadnum = x;
     	 pthread_create( &consumert[x], NULL, consumer, reinterpret_cast<void *>(inf));
      }
+     printf("---- consumers started --- sleep 1 - then producers ----\n\n");
+     sleep(1);
 
      for (int x=0;x<PRODUCER_THREADS;x++) {
     	 inf = new threadinfo;
@@ -185,6 +213,10 @@ int main()
  		printf("Thread num %d -> output %d\n", x, OUTPUT[x]);
  	}
 
+ 	for(int n=0;n<UNIQUE_VALUES;n++) {
+ 		printf("verify[%d] == %d\n", n,verify[n]);
+ 		assert(verify[n] == PRODUCER_THREADS);
+ 	}
 
 
      exit(0);

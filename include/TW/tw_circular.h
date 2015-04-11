@@ -26,12 +26,20 @@
 #endif
 
 
+
 //#define DEBUG_TW_CIRCULAR_H
 
+
 #ifdef DEBUG_TW_CIRCULAR_H
+#include <sys/syscall.h>
+
+static long gettid__twcircular() {
+	return syscall(SYS_gettid);
+}
+
 #pragma message "!!!!!!!!!!!! tw_circular is Debug Heavy!!"
 // confused? here: https://gcc.gnu.org/onlinedocs/cpp/Variadic-Macros.html
-#define TW_CIRCULAR_DBG_OUT(s,...) fprintf(stderr, "**DEBUG** " s "\n", ##__VA_ARGS__ )
+#define TW_CIRCULAR_DBG_OUT(s,...) fprintf(stderr, "**DEBUG (tid:%d)** " s "\n", gettid__twcircular(), ##__VA_ARGS__ )
 #define IF_CIRCULAR_DBG_OUT( x ) { x }
 #else
 #define TW_CIRCULAR_DBG_OUT(s,...) {}
@@ -350,11 +358,11 @@ void tw_safeCircular<T,ALLOC>::disable() {
  */
 template <class T,class ALLOC>
 void tw_safeCircular<T,ALLOC>::add( T &the_d ) {
-	TW_CIRCULAR_DBG_OUT("acquireAndKeepLock - add()");
 	sema.acquireAndKeepLock();
+	TW_CIRCULAR_DBG_OUT("post acquireAndKeepLock - add()");
 	nextIn = nextNextIn();
 	data[nextIn] = the_d;
-	TW_CIRCULAR_DBG_OUT("remain post-add(): %d",remain());
+	TW_CIRCULAR_DBG_OUT("remain post-add() data[%d]: %d",nextIn, remain());
 	sema.releaseSemaLock();
 //	unblock(); // let one blocking call know...
 }
@@ -362,8 +370,8 @@ void tw_safeCircular<T,ALLOC>::add( T &the_d ) {
 #ifdef TWLIB_HAS_MOVE_SEMANTICS
 template <class T,class ALLOC>
 void tw_safeCircular<T,ALLOC>::addMv( T &the_d ) {
-	TW_CIRCULAR_DBG_OUT("acquireAndKeepLock - add(move)");
 	sema.acquireAndKeepLock();
+	TW_CIRCULAR_DBG_OUT("post acquireAndKeepLock - add(move)");
 	nextIn = nextNextIn();
 	data[nextIn] = std::move(the_d);
 	TW_CIRCULAR_DBG_OUT("remain post-add(): %d",remain());
@@ -618,24 +626,24 @@ bool tw_safeCircular<T,ALLOC>::removeOrBlock( T &fill ) {
 	int rm = remain();
 	if(rm > 0) {
 		sema.releaseWithoutLock();
-		TW_CIRCULAR_DBG_OUT("   ...removeOrBlock(2).. remain = %d", remain());
+		TW_CIRCULAR_DBG_OUT("   ...removeOrBlock(2).. data[%d] remain = %d", nextOut, remain());
+		fill = data[nextOut];
 		nextOut = nextNextOut();
 		if(rm == 1) { // if we are now empty...
 			nextIn = -1; nextOut = 0; _reverse = false;
 		}
-		fill = data[nextOut];
 		sema.releaseSemaLock();
 	} else {
-		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(%d) waitForAcquirers", remain());
+		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(3) waitForAcquirers. remain = %d", remain());
 		int r = sema.waitForAcquirersKeepLock(false); // unlocks while waiting for acquire
 		if(r == 0) {
-			TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers complete. remain = %d", remain());
-			sema.releaseWithoutLock();
-			nextOut = nextNextOut();
+			TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers complete. data[%d] remain = %d", nextOut, remain());
+			fill = data[nextOut];
 			if(remain() == 0) { // if we are now empty...
 				nextIn = -1; nextOut = 0; _reverse = false;
 			}
-			fill = data[nextOut];
+			nextOut = nextNextOut();
+			sema.releaseWithoutLock();
 		} else {
 			ret = false;
 			TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers error (%d). remain = %d", r, remain());
@@ -653,24 +661,25 @@ bool tw_safeCircular<T,ALLOC>::removeOrBlock( T &fill, const int64_t usec_wait )
 	int rm = remain();
 	if(rm > 0) {
 		sema.releaseWithoutLock();
-		TW_CIRCULAR_DBG_OUT("   ...removeOrBlock(2).. remain = %d", remain());
+		TW_CIRCULAR_DBG_OUT("   ...removeOrBlock(2).. data[%d] remain = %d", nextOut, remain());
+		fill = data[nextOut];
 		nextOut = nextNextOut();
 		if(rm == 1) { // if we are now empty...
 			nextIn = -1; nextOut = 0; _reverse = false;
 		}
-		fill = data[nextOut];
 		sema.releaseSemaLock();
 	} else {
 		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(%d) waitForAcquirers", remain());
 		int r = sema.waitForAcquirersKeepLock(usec_wait, false); // unlocks while waiting for acquire
 		if(r == 0) {
 			TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers complete. remain = %d", remain());
-			sema.releaseWithoutLock();
-			nextOut = nextNextOut();
+			fill = data[nextOut];
 			if(remain() == 0) { // if we are now empty...
 				nextIn = -1; nextOut = 0; _reverse = false;
 			}
-			fill = data[nextOut];
+			TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(3). data[%d]",nextOut);
+			nextOut = nextNextOut();
+			sema.releaseWithoutLock();
 		} else {
 			ret = false;
 			TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers timeout or error (%d). remain = %d", r, remain());
@@ -690,24 +699,24 @@ bool tw_safeCircular<T,ALLOC>::removeMvOrBlock( T &fill ) {
 	int rm = remain();
 	if(rm > 0) {
 		sema.releaseWithoutLock();
-		TW_CIRCULAR_DBG_OUT("   ...removeOrBlock(2).. remain = %d", remain());
+		TW_CIRCULAR_DBG_OUT("   ...removeOrBlock(2).. data[%d] remain = %d", nextOut, remain());
+		fill = std::move(data[nextOut]);
 		nextOut = nextNextOut();
 		if(rm == 1) { // if we are now empty...
 			nextIn = -1; nextOut = 0; _reverse = false;
 		}
-		fill = std::move(data[nextOut]);
 		sema.releaseSemaLock();
 	} else {
-		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(%d) waitForAcquirers", remain());
+		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(3) waitForAcquirers. remain = %d", remain());
 		int r = sema.waitForAcquirersKeepLock(false); // unlocks while waiting for acquire
 		if(r == 0) {
-			TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers complete. remain = %d", remain());
-			sema.releaseWithoutLock();
-			nextOut = nextNextOut();
+			TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers complete. data[%d] remain = %d", nextOut, remain());
+			fill = std::move(data[nextOut]);
 			if(remain() == 0) { // if we are now empty...
 				nextIn = -1; nextOut = 0; _reverse = false;
 			}
-			fill = std::move(data[nextOut]);
+			nextOut = nextNextOut();
+			sema.releaseWithoutLock();
 		} else {
 			ret = false;
 			TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers error (%d). remain = %d", r, remain());
@@ -716,7 +725,6 @@ bool tw_safeCircular<T,ALLOC>::removeMvOrBlock( T &fill ) {
 	}
 	return ret;
 }
-
 template <class T,class ALLOC>
 bool tw_safeCircular<T,ALLOC>::removeMvOrBlock( T &fill, const int64_t usec_wait ) {
 	bool ret = true;
@@ -725,27 +733,27 @@ bool tw_safeCircular<T,ALLOC>::removeMvOrBlock( T &fill, const int64_t usec_wait
 	int rm = remain();
 	if(rm > 0) {
 		sema.releaseWithoutLock();
-		TW_CIRCULAR_DBG_OUT("   ...removeOrBlock(2).. remain = %d", remain());
+		TW_CIRCULAR_DBG_OUT("   ...removeOrBlock(2).. data[%d] remain = %d", nextOut, remain());
+		fill = std::move(data[nextOut]);
 		nextOut = nextNextOut();
 		if(rm == 1) { // if we are now empty...
 			nextIn = -1; nextOut = 0; _reverse = false;
 		}
-		fill = std::move(data[nextOut]);
 		sema.releaseSemaLock();
 	} else {
-		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(%d) waitForAcquirers", remain());
+		TW_CIRCULAR_DBG_OUT("  ...removeOrBlock(3) waitForAcquirers. remain = %d", remain());
 		int r = sema.waitForAcquirersKeepLock(usec_wait, false); // unlocks while waiting for acquire
 		if(r == 0) {
-			TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers complete. remain = %d", remain());
-			sema.releaseWithoutLock();
-			nextOut = nextNextOut();
+			TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers complete. data[%d] remain = %d", nextOut, remain());
+			fill = std::move(data[nextOut]);
 			if(remain() == 0) { // if we are now empty...
 				nextIn = -1; nextOut = 0; _reverse = false;
 			}
-			fill = std::move(data[nextOut]);
+			nextOut = nextNextOut();
+			sema.releaseWithoutLock();
 		} else {
 			ret = false;
-			TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers timeout or error (%d). remain = %d", r, remain());
+			TW_CIRCULAR_DBG_OUT("  ...waitForAcquirers error (%d). remain = %d", r, remain());
 		}
 		sema.releaseSemaLock();
 	}

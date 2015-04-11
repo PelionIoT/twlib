@@ -127,7 +127,7 @@ test_tw_sema: tw_lib tests/test_tw_sema.cpp $(TPLS) tw_log.o tw_utils.o
 	$(CXX) $(CFLAGS) $(TWLIBFLAG) $(LDFLAGS)  -I. -o $@ tests/$@.cpp tw_utils.o tw_log.o syscalls-$(ARCH).o $(TPLS) 
 
 test_twcircular: tw_lib tests/test_twcircular.cpp $(TPLS) tw_log.o tw_utils.o
-	$(CXX) $(CFLAGS) $(TWLIBFLAG) $(LDFLAGS) -g -I. -o $@ tests/$@.cpp tw_utils.o tw_log.o syscalls-$(ARCH).o $(TPLS) 
+	$(CXX) $(CFLAGS) $(TWLIBFLAG) $(LDFLAGS) -g -I. -o $@ tests/$@.cpp tw_utils.o tw_log.o syscalls-$(ARCH).o 
 
 test_twcircular_unblockall: tw_lib tests/test_twcircular_unblockall.cpp $(TPLS) tw_log.o tw_utils.o
 	$(CXX) $(CFLAGS) $(TWLIBFLAG) $(LDFLAGS) -g -I. -o $@ tests/$@.cpp tw_utils.o tw_log.o syscalls-$(ARCH).o $(TPLS) 

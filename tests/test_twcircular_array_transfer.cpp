@@ -26,7 +26,7 @@
 
 void *print_message_function( void *ptr );
 
-#define QUEUE_SIZE 20
+#define QUEUE_SIZE 5
 #define RUN_SIZE 200
 
 #define CONSUMER_THREADS 4
@@ -71,26 +71,26 @@ public:
 	void *p; // some data
 };
 
-
-bool ALLOW_COPY_CSTOR = false;  // tests to make sure the right cstor is being used below...
-
 class data {
 public:
 	int x;
-	data() : x(0) {}
-	data(data &o) : x(o.x) { assert(ALLOW_COPY_CSTOR); }
+	data() : x(-1000) {}
+	data(data &o) : x(o.x) {}
 	data& operator=(const data& o) {
 		x = o.x;
 		return *this;
 	}
-	data(data &&o) : x(o.x) { o.x = 0; }
+	data(data &&o) : x(o.x) { o.x = -1000; }
 };
 
 
 int main()
 {
 
-     tw_safeCircular<data, TESTAlloc > theQ( QUEUE_SIZE, true );
+	 int verify[QUEUE_SIZE];
+	 memset(verify,0,sizeof(QUEUE_SIZE));
+
+	 tw_safeCircular<data, TESTAlloc > theQ( QUEUE_SIZE, true );
 
      for(int n=0;n<QUEUE_SIZE;n++) {
     	 data d;
@@ -103,8 +103,11 @@ int main()
      data d;
      while(theQ.remove(d)) {
     	 printf("remove [%d]  = %d\n", n, d.x);
+    	 assert(n==d.x);
     	 n++;
      }
+
+     assert(n == QUEUE_SIZE);
 
      printf("--- again...\n");
 
@@ -119,10 +122,12 @@ int main()
      n = 0;
      while(theQ.remove(d)) {
     	 printf("remove [%d]  = %d\n", n, d.x);
+    	 assert(n==d.x);
     	 n++;
      }
 
-     printf("--- reverse ---\n");
+
+
 
      for(int n=0;n<QUEUE_SIZE;n++) {
     	 data d;
@@ -134,7 +139,23 @@ int main()
 
      tw_safeCircular<data, TESTAlloc > theQ2( QUEUE_SIZE, true );
 
+     assert(theQ.remaining() == QUEUE_SIZE);
+     printf("transfer to theQ2\n");
      theQ2.transferFrom(theQ);
+
+     assert(theQ.remaining() == 0);
+     assert(theQ2.remaining() == QUEUE_SIZE);
+
+
+     theQ.transferFrom(theQ2);
+     assert(theQ2.remaining() == 0);
+     assert(theQ.remaining() == QUEUE_SIZE);
+
+     theQ2.transferFrom(theQ);
+
+     assert(theQ.remaining() == 0);
+     assert(theQ2.remaining() == QUEUE_SIZE);
+
 
 
      for(int n=0;n<QUEUE_SIZE;n++) {
@@ -144,9 +165,8 @@ int main()
      }
 	 assert(!theQ.get(0,d)); // and assure the original Q got reinitialized
 
-
      tw_safeCircular<data, TESTAlloc > theQ3( QUEUE_SIZE, true );
-     ALLOW_COPY_CSTOR = true;
+
      theQ3.cloneFrom(theQ2);
 
      for(int n=0;n<QUEUE_SIZE;n++) {
@@ -166,7 +186,9 @@ int main()
     	 theQ4.add(d);
     	 n++;
      }
+     printf("---\n");
      assert(n == QUEUE_SIZE);
+     assert(theQ4.remaining() == QUEUE_SIZE);
 
      for(int n=0;n<QUEUE_SIZE;n++) {
     	 data d;
@@ -174,10 +196,10 @@ int main()
     	 assert(d.x == n);
      }
 
-
      theQ2.transferFrom(theQ4);
 
      assert(theQ4.remaining() == 0);
+     assert(theQ2.remaining() == QUEUE_SIZE);
 
      for(int n=0;n<QUEUE_SIZE;n++) {
     	 data d;
@@ -185,6 +207,95 @@ int main()
     	 assert(d.x == n);
      }
 
+     int z = 0;
+     while(theQ2.remove(d)) {
+    	 printf("Q2: remove [%d]  = %d\n", z, d.x);
+//    	 assert(d.x == z);
+    	 z++;
+     }
+     printf("---\n");
+
+     assert(z == QUEUE_SIZE);
+
+
+     // the logger.h test...
+
+
+	 tw_safeCircular<data, TESTAlloc > nextQ( QUEUE_SIZE, true );
+
+	 for(int p=0;p<QUEUE_SIZE;p++) {
+		 data d;
+		 d.x = p;
+		 nextQ.add(d);
+	 }
+	 assert(nextQ.remaining() == QUEUE_SIZE);
+
+	 tw_safeCircular<data, TESTAlloc > nextQ2( QUEUE_SIZE, true );
+
+	 for(int z=0;z<100;z++) {
+		 printf("<iterate %d > ",z);
+
+		 data outd;
+		 while(nextQ.remove(outd)) {
+			 nextQ2.add(outd);
+		 }
+
+		 assert(nextQ.remaining() == 0);
+//		 printf(" Q2.remain = %d ", nextQ2.remaining());
+		 assert(nextQ2.remaining() == QUEUE_SIZE);
+
+
+		 for(int n=0;n<QUEUE_SIZE;n++) {
+			 data d;
+			 assert(nextQ2.get(n,d));
+			 assert(d.x == n);
+		 }
+
+		 nextQ.transferFrom(nextQ2);
+
+		 assert(nextQ2.remaining() == 0);
+		 assert(nextQ.remaining() == QUEUE_SIZE);
+
+
+//		 printf("reverse()\n");
+
+
+	 }
+
+	 printf("\nhere...\n");
+
+	 for (int z=0;z<100;z++) {
+
+		 tw_safeCircular<data, TESTAlloc > nextQ3( QUEUE_SIZE, true );
+
+		 nextQ.reverse();
+		 printf("z:%d nextQ.remain = %d\n", z,nextQ.remaining());
+		 assert(nextQ.remaining() == QUEUE_SIZE);
+
+		 if(z== 1 || z%2 > 0) {
+			 printf("not reversed\n");
+			 for(int p=0;p<QUEUE_SIZE;p++) {
+				 data d;
+				 nextQ.remove(d);
+				 printf("rev: d.x = %d\n",d.x);
+				 assert(d.x == p);
+				 nextQ3.add(d);
+			 }
+		 } else {
+			 printf("reversed\n");
+			 for(int p=QUEUE_SIZE-1;p>=0;p--) {
+				 data d;
+				 nextQ.remove(d);
+				 printf("rev: d.x = %d\n",d.x);
+				 assert(d.x == p);
+				 nextQ3.add(d);
+			 }
+
+		 }
+
+		 nextQ.transferFrom(nextQ3);
+
+	 }
 
 //
 //
