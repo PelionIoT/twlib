@@ -1849,7 +1849,7 @@ tw_bndSafeFIFO<T,ALLOC> &tw_bndSafeFIFO<T,ALLOC>::operator=( const tw_bndSafeFIF
 
 	if(_sizeSema) {
 		_sizeSema->releaseAll();
-		delete _sizeSema();
+		delete _sizeSema;
 	}
 	_sizeSema = new TW_Sema( o._sizeSema->count() );
 	return *this;
@@ -1935,7 +1935,7 @@ void tw_bndSafeFIFO<T,ALLOC>::clearAll() { // delete all remaining links (and ho
 
 	if(_sizeSema) {
 		_sizeSema->releaseAll();
-		delete _sizeSema();
+		delete _sizeSema;
 	}
 	_sizeSema = new TW_Sema( _max );
 }
