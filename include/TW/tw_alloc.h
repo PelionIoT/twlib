@@ -15,7 +15,11 @@
 #define TW_ALLOC_H_
 
 #include <TW/tw_types.h>
+#ifdef __APPLE__
+#include <stdlib.h>
+#else
 #include <malloc.h>
+#endif
 #include <stdio.h>
 #include <string.h>
 
