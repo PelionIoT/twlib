@@ -44,7 +44,7 @@ ifdef FREESCALE
 	CSTOOLS_LIB=/opt/ltib/rootfs/lib
 	CROSS_CC_BASE=/opt/freescale/usr/local/gcc-4.4.4-glibc-2.11.1-multilib-1.0/arm-fsl-linux-gnueabi
 	CROSS_INCLUDE=$(CROSS_CC_BASE)/arm-fsl-linux-gnueabi/multi-libs/usr/include/
-	#/opt/freescale/usr/local/gcc-4.4.4-glibc-2.11.1-multilib-1.0/arm-fsl-linux-gnueabi
+#/opt/freescale/usr/local/gcc-4.4.4-glibc-2.11.1-multilib-1.0/arm-fsl-linux-gnueabi
 	CROSS_CC=$(CROSS_CC_BASE)/bin/$(TOOL_PREFIX)-gcc
 	CROSS_CXX=$(CROSS_CC_BASE)/bin/$(TOOL_PREFIX)-g++
 	CROSS_AR=$(CROSS_CC_BASE)/bin/$(TOOL_PREFIX)-ar
@@ -56,7 +56,7 @@ ifdef FREESCALE
 	CFLAGS+= -Lfreescale.out/expanded-prereqs/lib
 	OUTPUT_DIR=freescale.out
 else
-	CFLAGS+= -Lexpanded-prereqs/lib -Iexpanded-prereqs/include  -fPIC $(DEBUG_CFLAGS)
+	CFLAGS+= -Ldeps/lib -Ideps/include  -fPIC $(DEBUG_CFLAGS)
 endif
 
 GLIBCFLAG=-D_USING_GLIBC_
@@ -197,7 +197,7 @@ install: tw_lib $(EXTRA_TARGET)
 	ln -sf $(INSTALLPREFIX)/lib/$(TWSONAME) $(INSTALLPREFIX)/lib/$(TWSOVERSION) && \
 	ln -sf $(INSTALLPREFIX)/lib/$(TWSONAME) $(INSTALLPREFIX)/lib/$(TWSOLIBNAME)
 
-	
+
 
 
 
