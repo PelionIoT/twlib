@@ -19,3 +19,8 @@ cd sparsehash
 make
 make install
 
+cd ..
+cd googletest
+./configure --host=x86 --prefix=$PREFIX
+make
+make install
